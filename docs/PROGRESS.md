@@ -4,7 +4,7 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 
 | Fase                         | Estado       |
 | ---------------------------- | ------------ |
-| 0 — Preparación y validación | 🟡 En curso  |
+| 0 — Preparación y validación | ✅ Terminada |
 | 1 — Sesiones en vivo         | ⚪ Pendiente |
 | 2 — Uso                      | ⚪ Pendiente |
 | 3 — Proyectos y GitHub       | ⚪ Pendiente |
@@ -33,8 +33,8 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - [x] Análisis de las capturas y hallazgos en `docs/DECISIONS.md` (D-010).
 - [x] Inventario de solo lectura del vault de Obsidian y de los comandos `memory-load`, `memory-save` y `supabase-switch`.
 - [x] Desinstalar el hook de diagnóstico y verificar que `settings.json` quede como estaba (mismo SHA-1 que antes de instalar).
-- [ ] Borrar las capturas locales (con permiso del usuario).
-- [ ] Push y cierre de la fase.
+- [x] Borrar las capturas locales (con permiso del usuario).
+- [x] Push y cierre de la fase.
 
 ### Archivos principales
 
@@ -49,3 +49,16 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - El hook de diagnóstico se instala y desinstala sin dejar rastro en `~/.claude/settings.json`.
 - `docs/DECISIONS.md` documenta, por origen, qué eventos llegan, cómo distinguir el origen y dónde quedan los JSONL.
 - Existe el inventario del vault y de los comandos, sin contenido personal.
+
+### Cierre — 2026-09-25
+
+- `pnpm check` pasa en local (44 pruebas). El CI corre por primera vez con el push de cierre.
+- El hook de diagnóstico se instaló y desinstaló; `~/.claude/settings.json` quedó con el mismo SHA-1 que antes de instalar. Las capturas se borraron con permiso del usuario.
+- Los respaldos de `settings.json` se conservan en `~/Library/Application Support/Tokency/backups/`.
+- Decisiones de la fase: D-001 a D-010.
+
+### Pendientes para la Fase 1
+
+- Validar `SessionEnd` al cerrar Claude Desktop y la pestaña de la extensión, `Notification` `permission_prompt`, `SubagentStart` y `PreCompact` (D-010).
+- Decidir cómo empaquetar el core y el CLI para que el hook arranque rápido y no dependa del `PATH` (D-004, D-010).
+- Revisar la migración a TypeScript 7 cuando `typescript-eslint` la soporte (D-003).
