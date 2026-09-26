@@ -172,6 +172,7 @@ describe("startCore", () => {
       token,
       port: await freePort(),
       logger: silentLogger,
+      timing: { maintenanceMs: 100, transcriptGraceMs: 300, transcriptThrottleMs: 0 },
     });
 
     // La sesión de respaldo aparece tras el periodo de gracia, en el mantenimiento periódico.
@@ -180,7 +181,7 @@ describe("startCore", () => {
         await appendFile(path.join(project, `${UUID}.jsonl`), "{}\n");
         expect(core?.registry.list().map((s) => s.source)).toEqual(["transcript"]);
       },
-      { timeout: 15_000, interval: 250 },
+      { timeout: 10_000, interval: 100 },
     );
-  }, 20_000);
+  });
 });

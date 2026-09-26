@@ -24,6 +24,8 @@ export interface CoreOptions {
   port?: number;
   logger?: Logger;
   isAlive?: (pid: number) => boolean;
+  /** Para pruebas: tiempos más cortos que los de producción. */
+  timing?: { maintenanceMs?: number; transcriptGraceMs?: number; transcriptThrottleMs?: number };
 }
 
 export interface RunningCore {
@@ -44,7 +46,11 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
   const token = options.token ?? (await ensureApiToken()).token;
   const db = openDatabase(paths.dbFile);
   const repository = new SessionRepository(db, logger);
-  const registry = new SessionRegistry({ store: repository, timings: sessionTimings(config) });
+  const registry = new SessionRegistry({
+    store: repository,
+    timings: sessionTimings(config),
+    transcriptGraceMs: options.timing?.transcriptGraceMs,
+  });
   registry.load();
   repository.pruneHookEvents(Date.now() - HOOK_EVENT_RETENTION_MS);
 
@@ -69,6 +75,7 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
   const port = typeof address === "object" && address !== null ? address.port : config.port;
 
   const transcripts = watchTranscripts({
+    throttleMs: options.timing?.transcriptThrottleMs,
     projectsDir: paths.claudeProjectsDir,
     logger,
     onActivity: ({ sessionId, transcriptPath, cwd }) => {
@@ -90,7 +97,7 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
     } catch (error) {
       logger.error("Falló el mantenimiento periódico", { error });
     }
-  }, MAINTENANCE_INTERVAL_MS);
+  }, options.timing?.maintenanceMs ?? MAINTENANCE_INTERVAL_MS);
 
   logger.info("Core iniciado", { version, port, sessions: registry.list().length });
 

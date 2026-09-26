@@ -124,6 +124,7 @@ Dos variables de entorno que el hook hereda bastan; no hace falta recorrer la ca
 - **Contexto:** la Mac no tiene Xcode, solo las Command Line Tools. Se comprobó que SwiftPM compila SwiftUI, AppKit y ServiceManagement con ellas.
 - **Decisión (del usuario):** la app se define en `apps/mac/Package.swift` (texto versionable, que era el objetivo de XcodeGen) y se compila con `swift build`. Un script arma el `.app` (`LSUIElement`) y lo firma localmente.
 - **Consecuencia:** no hay catálogos de assets ni vistas previas de Xcode. La Fase 8 (iPhone) sí necesitará Xcode.
+- **Pruebas:** sin Xcode tampoco hay XCTest ni Swift Testing (falta su plugin de macros). La lógica pura vive en `TokencyKit` y se verifica con el ejecutable `TokencyKitChecks` (`swift run --package-path apps/mac TokencyKitChecks`), que también corre en un job de macOS del CI. Por la misma razón la app no usa macros como `@Observable` ni `#Preview`.
 
 ## D-013 · Empaquetado, hooks asíncronos y token — 2026-09-25
 

@@ -65,3 +65,6 @@ supabase/.env
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# ─── App de Mac (SwiftPM) ────────────────────────────────────────
+apps/mac/build/

@@ -34,3 +34,13 @@ jobs:
       - run: pnpm format:check
       - run: pnpm test
       - run: pnpm build
+
+  mac:
+    name: App de Mac (SwiftPM)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - run: swift --version
+      - run: swift run --package-path apps/mac TokencyKitChecks
+      - run: swift build --package-path apps/mac -c release --product Tokency

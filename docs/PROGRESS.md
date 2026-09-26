@@ -92,13 +92,13 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
    - `hook <evento>`: lee stdin, sanea el payload y lo reenvía al core; no imprime nada y siempre sale con 0.
    - `install`, `uninstall`, `uninstall-hooks`, `doctor`, `status` y `logs`.
 7. ✅ **Empaquetado (D-013):** esbuild genera un solo bundle; `install` lo copia a `~/Library/Application Support/Tokency/app/` y deja un LaunchAgent y el comando `~/.local/bin/tokency`.
-8. 🛑 **CHECKPOINT:** el usuario ejecuta `tokency install`, porque Claude no puede modificar `~/.claude/settings.json`. Después se verifica con `tokency doctor` y `tokency status`, usando sesiones reales.
-9. **App de Mac** (`apps/mac`, SwiftPM, D-012):
+8. 🛑 **CHECKPOINT (se une con el 11 para pausar una sola vez):** el usuario ejecuta `tokency install`, porque Claude no puede modificar `~/.claude/settings.json`. Después se verifica con `tokency doctor` y `tokency status`, usando sesiones reales.
+9. ✅ **App de Mac** (`apps/mac`, SwiftPM, D-012):
    - Barra de menús con sesiones, estado del core y opción para reiniciarlo.
    - Bandas en un `NSPanel` que no roba el foco, visible en todos los Spaces y junto a apps en pantalla completa.
    - Al pasar el mouse la banda se expande; al hacer clic trae al frente la app de origen.
    - Soporta varios monitores y arranca al iniciar sesión (`SMAppService`).
-10. **Script del `.app`:** `scripts/mac/build-app.sh` compila, arma el `.app`, lo firma localmente y lo instala en `~/Applications/`.
+10. ✅ **Script del `.app`:** `scripts/mac/build-app.sh` compila, arma el `.app`, lo firma localmente y lo instala en `~/Applications/`.
 11. 🛑 **CHECKPOINT:** prueba real con Terminal y Antigravity; después, reinicio de la Mac.
 12. Actualizar `docs/PROGRESS.md`, hacer push y cerrar la fase.
 
