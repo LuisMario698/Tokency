@@ -63,3 +63,52 @@ Registro de decisiones técnicas y de los ajustes a [SPEC.md](SPEC.md). Cada ent
 - **Contexto:** el spec supone que `memory-load`, `memory-save` y `supabase-switch` viven en `~/.claude/commands/`.
 - **Hallazgos:** ese directorio no existe; las definiciones están dentro del vault (`claude-commands/`) y hoy ningún comando está activo. Casi todo el vault está sin descargar de iCloud, y las notas de Supabase contienen tokens. Detalle en [OBSIDIAN.md](OBSIDIAN.md).
 - **Decisión:** en la Fase 6 no hay comandos que respaldar en `~/.claude/`. El importador descarga de iCloud antes de leer, nunca copia secretos y los lista en el reporte del `--dry-run`. El destino de `pendientes.md` se decide en la Fase 4.
+
+## D-010 · Eventos de Claude Code por origen — 2026-09-25
+
+- **Contexto:** hook de diagnóstico (D-005) instalado unos 20 minutos, con sesiones de prueba en Terminal.app, en la terminal integrada de Antigravity, en la extensión de Claude Code para Antigravity (2.1.282) y en la pestaña Code de Claude Desktop (2.1.281). El CLI instalado es la 2.1.283.
+
+### Cómo distinguir el origen
+
+Dos variables de entorno que el hook hereda bastan; no hace falta recorrer la cadena de procesos.
+
+| Origen                            | `CLAUDE_CODE_ENTRYPOINT` | `__CFBundleIdentifier`           | Otras señales                                                      |
+| --------------------------------- | ------------------------ | -------------------------------- | ------------------------------------------------------------------ |
+| Terminal.app                      | `cli`                    | `com.apple.Terminal`             | `TERM_PROGRAM=Apple_Terminal`                                      |
+| Terminal integrada de Antigravity | `cli`                    | `com.google.antigravity-ide`     | `TERM_PROGRAM=vscode`                                              |
+| Extensión de Antigravity          | `claude-vscode`          | `com.google.antigravity-ide`     | Binario dentro de `~/.antigravity-ide/extensions/`                 |
+| Claude Desktop (pestaña Code)     | `claude-desktop`         | `com.anthropic.claudefordesktop` | Binario en `~/Library/Application Support/Claude/claude-code/<v>/` |
+
+- **Decisión:** `origin` sale de `CLAUDE_CODE_ENTRYPOINT` y el bundle id de `__CFBundleIdentifier`, que también sirve para traer la app al frente. El hook reporta además el pid de `claude` (su proceso padre directo) para saber si la sesión sigue viva.
+- El modo chat de Claude Desktop no generó ningún evento, como se esperaba (spec §4.2).
+
+### Eventos y campos observados
+
+- En los cuatro orígenes llegan `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse` y `Stop`.
+- `PermissionRequest` llega en cuanto aparece el diálogo de permiso. Con el modo `auto` (el habitual del usuario) casi nunca hay diálogo, así que tampoco hay evento.
+- `Notification` con `notification_type=idle_prompt` llega 60 s después de `Stop` si el usuario no escribe.
+- `SessionEnd` solo llegó con `/exit` en el CLI (`reason=prompt_input_exit`). Al cerrar la conversación en la extensión o en Desktop, el proceso `claude` siguió vivo y no llegó `SessionEnd`.
+- Nombres reales de los campos: `source` (en `SessionStart`), `reason` (en `SessionEnd`), `prompt` (en `UserPromptSubmit`), `notification_type` y `message` (en `Notification`). Todos los eventos traen `session_id`, `transcript_path`, `cwd` y `scratchpad_dir`; casi todos, `prompt_id` y `permission_mode`.
+- `model` solo viene en el `SessionStart` del CLI; la extensión y Desktop no lo mandan. El modelo se tomará del JSONL (Fase 2).
+- `Stop` incluye `background_tasks` y `session_crons` (vacíos en las pruebas).
+
+### Hallazgos que cambian el diseño de la Fase 1
+
+1. **Los hooks se aplican a sesiones ya abiertas** alrededor de 1 s después de cambiar `settings.json`, pero esas sesiones nunca mandan `SessionStart`. El core crea la sesión con el primer evento que reciba, sea cual sea.
+2. **En la extensión, `SessionStart` llega al abrir el panel**, minutos antes del primer prompt. `SessionStart` deja la sesión en `idle`, no en `working`.
+3. **Un mismo `session_id` puede estar vivo en dos procesos a la vez:** la extensión de Antigravity retomó (`source=resume`) una sesión iniciada en Terminal.app mientras esta seguía abierta. El core identifica cada instancia por `session_id` + pid, y el `SessionEnd` de un proceso no cierra la instancia del otro.
+4. **Después de `Stop` llega un `SubagentStop` con `agent_type` vacío** y sin `SubagentStart` (un agente interno del CLI y de Desktop). Se ignora para calcular el estado.
+5. **`SessionEnd` no es confiable fuera del CLI.** El core vigila el pid de `claude` y marca `ended` cuando el proceso muere. Si el proceso sigue vivo sin actividad, se aplica el umbral de inactividad del spec (§4.2).
+6. **El `PATH` cambia según el origen**, y `node` resuelve a Homebrew (26) o a nvm (24) según el orden. El comando del hook usa rutas absolutas fijadas al instalar; esto entra en la decisión de empaquetado pendiente de D-004.
+7. **Estados propuestos:** `UserPromptSubmit`, `PreToolUse` y `PostToolUse` → `working`; `PermissionRequest` (y `PreToolUse` de `AskUserQuestion`) → `waiting`; `Stop` → `done`; `Notification` `idle_prompt` → `idle`. Se revisa con datos reales en la Fase 1.
+
+### Registros JSONL
+
+- Todos los orígenes, incluido Desktop, escriben en `~/.claude/projects/<cwd codificado>/<session_id>.jsonl`. Los subagentes escriben en `<session_id>/subagents/agent-<agent_id>.jsonl`.
+- La codificación cambia `/` y `_` por `-`, así que no se puede revertir. La ruta real sale del `cwd` del payload o del JSONL.
+
+### Sin validar (se revisa en la Fase 1)
+
+- `SessionEnd` al cerrar Claude Desktop con ⌘Q y al cerrar la pestaña de la extensión.
+- `Notification` con `notification_type=permission_prompt`: el permiso se aprobó a los 3 s y no llegó.
+- `SubagentStart` y `PreCompact`: no ocurrieron durante las pruebas.
