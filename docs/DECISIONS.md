@@ -135,3 +135,18 @@ Dos variables de entorno que el hook hereda bastan; no hace falta recorrer la ca
   - Como los hooks asíncronos pueden llegar desordenados, cada uno manda la hora en que arrancó y el core ignora, para calcular el estado, los eventos más viejos que el último aplicado.
 - **Payload:** el hook lo sanea antes de enviarlo. Nunca manda `tool_input`, `tool_response` ni `last_assistant_message`. Del prompt solo guarda los primeros 200 caracteres, en SQLite local, para mostrarlo en la banda (spec §4.9).
 - **Token:** 32 bytes aleatorios en el Llavero (servicio `com.tokency.core`). Se escribe con `security -i` por stdin para que no aparezca en la lista de procesos. La app de Mac lo lee con `/usr/bin/security` y no con el framework Security, para evitar diálogos de acceso después de cada recompilación con firma local.
+
+## D-014 · Reglas de estado de las sesiones — 2026-09-25
+
+- **Contexto:** D-010 propuso un mapeo de eventos a estados para revisarlo en la Fase 1. El implementado está en `packages/core/src/sessions/state-machine.ts`.
+- **Decisión:**
+  - `SessionStart` → `idle`; si `source=compact`, → `working`.
+  - `UserPromptSubmit`, `PostToolUse` y `PreCompact` → `working`. `PreToolUse` también, salvo con `AskUserQuestion` o `ExitPlanMode`, que dejan la sesión en `waiting`.
+  - `PermissionRequest` y `Notification` con `permission_prompt` o `elicitation_dialog` → `waiting`.
+  - `Stop` → `done`. `SessionEnd` → `ended`.
+  - `SubagentStart`, `SubagentStop` y los demás `Notification` no cambian el estado.
+  - **Cambio respecto a D-010:** `idle_prompt` no pasa la sesión a `idle`. `done` (verde) se mantiene 15 min (configurable) para que no se escape que una sesión terminó; después pasa a `idle`.
+  - Sin actividad durante 60 min (configurable), la sesión termina con motivo `inactivity`. Si el proceso de `claude` muere, termina con `process-exited`.
+  - Una sesión terminada solo se reabre con `SessionStart` o `UserPromptSubmit`; los demás eventos rezagados se ignoran.
+  - Un evento con `ts` menor al último aplicado solo completa datos (modelo, cwd), sin cambiar el estado.
+  - Una sesión vista solo por su JSONL se crea tras 5 s de gracia, por si su primer hook viene en camino, y se reemplaza en cuanto llegan los hooks.
