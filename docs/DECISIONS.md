@@ -112,3 +112,26 @@ Dos variables de entorno que el hook hereda bastan; no hace falta recorrer la ca
 - `SessionEnd` al cerrar Claude Desktop con ⌘Q y al cerrar la pestaña de la extensión.
 - `Notification` con `notification_type=permission_prompt`: el permiso se aprobó a los 3 s y no llegó.
 - `SubagentStart` y `PreCompact`: no ocurrieron durante las pruebas.
+
+## D-011 · `node:sqlite` en lugar de better-sqlite3 — 2026-09-25
+
+- **Contexto:** el spec pide better-sqlite3. Es un módulo nativo que se compila para una versión concreta de Node y se rompe cuando Homebrew o nvm la actualizan. `node:sqlite` viene con Node, es candidato a estable desde Node 24.15 (Stability 1.2) y trae SQLite 3.53.
+- **Decisión:** usar `node:sqlite` (`DatabaseSync`) y subir `engines.node` a `>=24.15`.
+- **Consecuencia:** sin dependencias nativas, así que el core se empaqueta en un solo archivo. Si la API cambiara antes de ser estable, el acceso a la base está aislado en `packages/core/src/db/`.
+
+## D-012 · App de Mac con Swift Package Manager en lugar de Xcode — 2026-09-25
+
+- **Contexto:** la Mac no tiene Xcode, solo las Command Line Tools. Se comprobó que SwiftPM compila SwiftUI, AppKit y ServiceManagement con ellas.
+- **Decisión (del usuario):** la app se define en `apps/mac/Package.swift` (texto versionable, que era el objetivo de XcodeGen) y se compila con `swift build`. Un script arma el `.app` (`LSUIElement`) y lo firma localmente.
+- **Consecuencia:** no hay catálogos de assets ni vistas previas de Xcode. La Fase 8 (iPhone) sí necesitará Xcode.
+
+## D-013 · Empaquetado, hooks asíncronos y token — 2026-09-25
+
+- **Empaquetado:** esbuild genera un bundle ESM con división de código. Así `tokency hook` carga poco y `serve` importa el core bajo demanda. `tokency install` copia el bundle a `~/Library/Application Support/Tokency/app/`, de modo que recompilar el repo no afecta a los hooks ni al core en uso hasta reinstalar.
+- **Node:** el LaunchAgent y los hooks usan una ruta absoluta de `node`, resuelta al instalar sin depender del `PATH` (D-010). Si es de Homebrew, se usa el enlace estable `/opt/homebrew/opt/node/bin/node` en lugar de la ruta versionada de `Cellar`.
+- **Hooks:**
+  - Todos usan `async: true`, que según la documentación vigente corre en segundo plano sin bloquear a Claude. La excepción es `SessionStart`, que en la Fase 4 devolverá contexto.
+  - Se usa la forma de shell con rutas entre comillas, probada en los cuatro orígenes.
+  - Como los hooks asíncronos pueden llegar desordenados, cada uno manda la hora en que arrancó y el core ignora, para calcular el estado, los eventos más viejos que el último aplicado.
+- **Payload:** el hook lo sanea antes de enviarlo. Nunca manda `tool_input`, `tool_response` ni `last_assistant_message`. Del prompt solo guarda los primeros 200 caracteres, en SQLite local, para mostrarlo en la banda (spec §4.9).
+- **Token:** 32 bytes aleatorios en el Llavero (servicio `com.tokency.core`). Se escribe con `security -i` por stdin para que no aparezca en la lista de procesos. La app de Mac lo lee con `/usr/bin/security` y no con el framework Security, para evitar diálogos de acceso después de cada recompilación con firma local.

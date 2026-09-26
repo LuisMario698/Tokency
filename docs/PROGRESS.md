@@ -5,7 +5,7 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 | Fase                         | Estado       |
 | ---------------------------- | ------------ |
 | 0 — Preparación y validación | ✅ Terminada |
-| 1 — Sesiones en vivo         | ⚪ Pendiente |
+| 1 — Sesiones en vivo         | 🟡 En curso  |
 | 2 — Uso                      | ⚪ Pendiente |
 | 3 — Proyectos y GitHub       | ⚪ Pendiente |
 | 4 — Contexto                 | ⚪ Pendiente |
@@ -62,3 +62,62 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - Validar `SessionEnd` al cerrar Claude Desktop y la pestaña de la extensión, `Notification` `permission_prompt`, `SubagentStart` y `PreCompact` (D-010).
 - Decidir cómo empaquetar el core y el CLI para que el hook arranque rápido y no dependa del `PATH` (D-004, D-010).
 - Revisar la migración a TypeScript 7 cuando `typescript-eslint` la soporte (D-003).
+
+---
+
+## Fase 1 — Sesiones en vivo
+
+**Objetivo:** ver cada sesión de Claude Code como una banda de color en el borde de la pantalla, en tiempo real, y que todo arranque solo al encender la Mac.
+
+**Listo cuando:** abrir y usar sesiones en la terminal y en Antigravity se refleja en las bandas en tiempo real con el color correcto, y al reiniciar la Mac todo sigue funcionando sin intervención.
+
+### Tareas
+
+1. **Modelo compartido** (`packages/shared`): esquemas Zod del evento de hook saneado, de la sesión y de los eventos en vivo.
+2. **Máquina de estados** (`packages/core/src/sessions/`): función pura con pruebas. Aplica las reglas de D-010: estados `working`, `waiting`, `done`, `idle` y `ended`; instancias por `session_id` + pid; eventos desordenados; `SubagentStop` interno ignorado.
+3. **Core:**
+   - Configuración en `~/Library/Application Support/Tokency/config.json`.
+   - Logs rotativos en `~/Library/Logs/Tokency/`.
+   - SQLite con `node:sqlite` (D-011) y migraciones versionadas.
+   - Registro de sesiones persistente.
+4. **API local** (Hono en `127.0.0.1:7777`):
+   - Token Bearer guardado en el Llavero; revisión del encabezado `Host` y rechazo de peticiones de navegador.
+   - Rutas `GET /v1/health`, `POST /v1/hooks`, `GET /v1/sessions` y `GET /v1/events` (SSE).
+5. **Fuentes de respaldo:**
+   - Vigilante de `~/.claude/projects/` con eventos del sistema de archivos.
+   - Revisión del pid de `claude` para detectar que el proceso murió.
+   - Umbrales de inactividad configurables.
+6. **CLI `tokency`:**
+   - `serve`: arranca el core.
+   - `hook <evento>`: lee stdin, sanea el payload y lo reenvía al core; no imprime nada y siempre sale con 0.
+   - `install`, `uninstall`, `uninstall-hooks`, `doctor`, `status` y `logs`.
+7. **Empaquetado (D-013):** esbuild genera un solo bundle; `install` lo copia a `~/Library/Application Support/Tokency/app/` y deja un LaunchAgent y el comando `~/.local/bin/tokency`.
+8. 🛑 **CHECKPOINT:** el usuario ejecuta `tokency install`, porque Claude no puede modificar `~/.claude/settings.json`. Después se verifica con `tokency doctor` y `tokency status`, usando sesiones reales.
+9. **App de Mac** (`apps/mac`, SwiftPM, D-012):
+   - Barra de menús con sesiones, estado del core y opción para reiniciarlo.
+   - Bandas en un `NSPanel` que no roba el foco, visible en todos los Spaces y junto a apps en pantalla completa.
+   - Al pasar el mouse la banda se expande; al hacer clic trae al frente la app de origen.
+   - Soporta varios monitores y arranca al iniciar sesión (`SMAppService`).
+10. **Script del `.app`:** `scripts/mac/build-app.sh` compila, arma el `.app`, lo firma localmente y lo instala en `~/Applications/`.
+11. 🛑 **CHECKPOINT:** prueba real con Terminal y Antigravity; después, reinicio de la Mac.
+12. Actualizar `docs/PROGRESS.md`, hacer push y cerrar la fase.
+
+### Archivos principales
+
+- `packages/shared/src/`: `hook-event.ts`, `session.ts`, `live-events.ts`.
+- `packages/core/src/`:
+  - `sessions/` (máquina de estados y registro), `db/` (conexión y migraciones), `api/` (servidor, autenticación y SSE), `watchers/` (transcripts y procesos).
+  - `config.ts`, `logger.ts`, `keychain.ts`, `launch-agent.ts`.
+- `packages/cli/src/`: `main.ts` y `commands/{serve,hook,install,uninstall,doctor,status,logs}.ts`.
+- `scripts/build.ts` (esbuild).
+- `apps/mac/Package.swift`, `apps/mac/Sources/TokencyMac/`, `scripts/mac/build-app.sh`.
+
+### Criterios de aceptación
+
+- `pnpm check` pasa en local y en CI; `swift build` compila la app sin errores.
+- `tokency hook` tarda menos de 150 ms, nunca imprime nada y sale con 0 aunque el core esté apagado.
+- Solo `SessionStart` es síncrono; los demás hooks usan `async: true` (D-013).
+- La API rechaza peticiones sin token, con token incorrecto o con un `Host` o un `Origin` ajenos.
+- `tokency uninstall` deja `~/.claude/settings.json` byte por byte como estaba y quita el LaunchAgent.
+- `tokency doctor` reporta todo en verde y explica cómo arreglar cada problema.
+- Las bandas cambian de color en menos de 1 s y desaparecen al cerrar la sesión.

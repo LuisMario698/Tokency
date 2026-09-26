@@ -11,6 +11,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@tokency/shared": "workspace:*"
+    "@hono/node-server": "^2.1.1",
+    "@tokency/shared": "workspace:*",
+    "hono": "^4.13.9"
   }
 }
