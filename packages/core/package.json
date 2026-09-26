@@ -1,0 +1,16 @@
+{
+  "name": "@tokency/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Servicio local de Tokency: toda la lógica vive aquí.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tokency/shared": "workspace:*"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@tokency/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Comando tokency: cliente delgado del core.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@tokency/core": "workspace:*",
+    "@tokency/shared": "workspace:*"
+  }
+}

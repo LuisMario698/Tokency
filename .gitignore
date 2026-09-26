@@ -1,0 +1,67 @@
+# ─── Secretos: nunca se versionan ────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.cer
+*.crt
+*.keychain
+*.keychain-db
+*.mobileprovision
+id_rsa*
+id_ed25519*
+credentials*.json
+client_secret*.json
+service-account*.json
+token.json
+tokens.json
+*-token.json
+*.token
+.secrets/
+/secrets/
+
+# ─── Datos locales de Tokency ────────────────────────────────────
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.db
+*.db-*
+*.log
+
+# ─── Node / pnpm ─────────────────────────────────────────────────
+node_modules/
+dist/
+coverage/
+.pnpm-store/
+*.tsbuildinfo
+.eslintcache
+npm-debug.log*
+pnpm-debug.log*
+
+# ─── Swift / Xcode (el proyecto se genera con XcodeGen) ──────────
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.build/
+.swiftpm/
+
+# ─── Supabase CLI (estado local) ─────────────────────────────────
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# ─── Sistema y editores ──────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

@@ -1,0 +1,13 @@
+{
+  "name": "@tokency/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tipos y esquemas compartidos entre los paquetes de Tokency.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

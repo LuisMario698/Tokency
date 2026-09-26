@@ -2,17 +2,17 @@
 
 Registro vivo del avance por fases. La especificación completa está en [SPEC.md](SPEC.md) y las decisiones en [DECISIONS.md](DECISIONS.md).
 
-| Fase | Estado |
-|---|---|
-| 0 — Preparación y validación | 🟡 En curso |
-| 1 — Sesiones en vivo | ⚪ Pendiente |
-| 2 — Uso | ⚪ Pendiente |
-| 3 — Proyectos y GitHub | ⚪ Pendiente |
-| 4 — Contexto | ⚪ Pendiente |
-| 5 — Google Drive | ⚪ Pendiente |
-| 6 — Migración de Obsidian | ⚪ Pendiente |
-| 7 — Extras | ⚪ Pendiente |
-| 8 — iPhone | ⚪ Pendiente |
+| Fase                         | Estado       |
+| ---------------------------- | ------------ |
+| 0 — Preparación y validación | 🟡 En curso  |
+| 1 — Sesiones en vivo         | ⚪ Pendiente |
+| 2 — Uso                      | ⚪ Pendiente |
+| 3 — Proyectos y GitHub       | ⚪ Pendiente |
+| 4 — Contexto                 | ⚪ Pendiente |
+| 5 — Google Drive             | ⚪ Pendiente |
+| 6 — Migración de Obsidian    | ⚪ Pendiente |
+| 7 — Extras                   | ⚪ Pendiente |
+| 8 — iPhone                   | ⚪ Pendiente |
 
 ---
 
@@ -23,9 +23,9 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 ### Tareas
 
 - [x] Guardar la especificación como `docs/SPEC.md` (primer commit).
-- [ ] Monorepo con pnpm workspaces: `packages/shared`, `packages/core`, `packages/cli`, `supabase/migrations/`, `scripts/`.
-- [ ] Tooling: TypeScript estricto, ESLint (type-checked), Prettier, Vitest.
-- [ ] `.gitignore` estricto: secretos, `.env*`, llaves, credenciales OAuth, bases locales, artefactos de Xcode.
+- [x] Monorepo con pnpm workspaces: `packages/shared`, `packages/core`, `packages/cli`, `supabase/migrations/`, `scripts/`.
+- [x] Tooling: TypeScript estricto, ESLint (type-checked), Prettier, Vitest.
+- [x] `.gitignore` estricto: secretos, `.env*`, llaves, credenciales OAuth, bases locales, artefactos de Xcode.
 - [ ] CI en GitHub Actions: typecheck, lint, formato y pruebas.
 - [ ] Módulo de respaldo y fusión de `~/.claude/settings.json` en `packages/core` (con pruebas), reutilizable por `tokency install` en la Fase 1.
 - [ ] Hook de diagnóstico temporal (`scripts/diagnostics/`) que guarda los payloads fuera del repo.
