@@ -4,8 +4,11 @@
   "private": true,
   "description": "Servicio local de Tokency: toda la lógica vive aquí.",
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./keychain": "./src/keychain.ts",
+    "./paths": "./src/paths.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

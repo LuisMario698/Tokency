@@ -89,6 +89,7 @@ export function hasOwnHooks(settings: JsonObject, isOwn: OwnershipTest): boolean
 function commandHookToJson(hook: CommandHook): JsonObject {
   const entry: JsonObject = { type: hook.type, command: hook.command };
   if (hook.timeout !== undefined) entry.timeout = hook.timeout;
+  if (hook.async !== undefined) entry.async = hook.async;
   return entry;
 }
 

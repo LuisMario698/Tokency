@@ -73,25 +73,25 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 
 ### Tareas
 
-1. **Modelo compartido** (`packages/shared`): esquemas Zod del evento de hook saneado, de la sesión y de los eventos en vivo.
-2. **Máquina de estados** (`packages/core/src/sessions/`): función pura con pruebas. Aplica las reglas de D-010: estados `working`, `waiting`, `done`, `idle` y `ended`; instancias por `session_id` + pid; eventos desordenados; `SubagentStop` interno ignorado.
-3. **Core:**
+1. ✅ **Modelo compartido** (`packages/shared`): esquemas Zod del evento de hook saneado, de la sesión y de los eventos en vivo.
+2. ✅ **Máquina de estados** (`packages/core/src/sessions/`): función pura con pruebas. Aplica las reglas de D-010: estados `working`, `waiting`, `done`, `idle` y `ended`; instancias por `session_id` + pid; eventos desordenados; `SubagentStop` interno ignorado.
+3. ✅ **Core:**
    - Configuración en `~/Library/Application Support/Tokency/config.json`.
    - Logs rotativos en `~/Library/Logs/Tokency/`.
    - SQLite con `node:sqlite` (D-011) y migraciones versionadas.
    - Registro de sesiones persistente.
-4. **API local** (Hono en `127.0.0.1:7777`):
+4. ✅ **API local** (Hono en `127.0.0.1:7777`):
    - Token Bearer guardado en el Llavero; revisión del encabezado `Host` y rechazo de peticiones de navegador.
    - Rutas `GET /v1/health`, `POST /v1/hooks`, `GET /v1/sessions` y `GET /v1/events` (SSE).
-5. **Fuentes de respaldo:**
+5. ✅ **Fuentes de respaldo:**
    - Vigilante de `~/.claude/projects/` con eventos del sistema de archivos.
    - Revisión del pid de `claude` para detectar que el proceso murió.
    - Umbrales de inactividad configurables.
-6. **CLI `tokency`:**
+6. ✅ **CLI `tokency`:**
    - `serve`: arranca el core.
    - `hook <evento>`: lee stdin, sanea el payload y lo reenvía al core; no imprime nada y siempre sale con 0.
    - `install`, `uninstall`, `uninstall-hooks`, `doctor`, `status` y `logs`.
-7. **Empaquetado (D-013):** esbuild genera un solo bundle; `install` lo copia a `~/Library/Application Support/Tokency/app/` y deja un LaunchAgent y el comando `~/.local/bin/tokency`.
+7. ✅ **Empaquetado (D-013):** esbuild genera un solo bundle; `install` lo copia a `~/Library/Application Support/Tokency/app/` y deja un LaunchAgent y el comando `~/.local/bin/tokency`.
 8. 🛑 **CHECKPOINT:** el usuario ejecuta `tokency install`, porque Claude no puede modificar `~/.claude/settings.json`. Después se verifica con `tokency doctor` y `tokency status`, usando sesiones reales.
 9. **App de Mac** (`apps/mac`, SwiftPM, D-012):
    - Barra de menús con sesiones, estado del core y opción para reiniciarlo.

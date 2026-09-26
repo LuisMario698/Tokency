@@ -37,6 +37,18 @@ describe("mergeOwnHooks", () => {
     });
   });
 
+  it("conserva `async` en los hooks que corren en segundo plano", () => {
+    const background: HooksConfig = {
+      Stop: [{ hooks: [{ type: "command", command: "/opt/tokency/hook stop", async: true }] }],
+    };
+
+    const merged = mergeOwnHooks({}, background, isOwn);
+
+    expect((merged.hooks as JsonObject).Stop).toEqual([
+      { hooks: [{ type: "command", command: "/opt/tokency/hook stop", async: true }] },
+    ]);
+  });
+
   it("no muta el objeto recibido", () => {
     const settings: JsonObject = { hooks: { PreToolUse: [userGroup] } };
     const before = structuredClone(settings);

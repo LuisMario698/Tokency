@@ -10,6 +10,8 @@ export interface CommandHook {
   type: "command";
   command: string;
   timeout?: number;
+  /** Corre en segundo plano sin bloquear a Claude (D-013). */
+  async?: boolean;
 }
 
 export interface HookMatcherGroup {

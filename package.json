@@ -16,11 +16,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
-    "diag": "node scripts/diagnostics/diag-hooks.ts"
+    "diag": "node scripts/diagnostics/diag-hooks.ts",
+    "build": "node scripts/build.ts",
+    "tokency": "node packages/cli/dist/tokency.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.0.0",
+    "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
