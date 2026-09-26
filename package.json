@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "diag": "node scripts/diagnostics/diag-hooks.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

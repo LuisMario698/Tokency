@@ -1,4 +1,10 @@
-export { commandContains, hasOwnHooks, mergeOwnHooks, removeOwnHooks } from "./hooks.ts";
+export {
+  commandContains,
+  hasOwnHooks,
+  isJsonObject,
+  mergeOwnHooks,
+  removeOwnHooks,
+} from "./hooks.ts";
 export {
   defaultClaudeSettingsPaths,
   installHooks,

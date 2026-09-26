@@ -28,7 +28,7 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - [x] `.gitignore` estricto: secretos, `.env*`, llaves, credenciales OAuth, bases locales, artefactos de Xcode.
 - [x] CI en GitHub Actions: typecheck, lint, formato y pruebas.
 - [x] Módulo de respaldo y fusión de `~/.claude/settings.json` en `packages/core` (con pruebas), reutilizable por `tokency install` en la Fase 1.
-- [ ] Hook de diagnóstico temporal (`scripts/diagnostics/`) que guarda los payloads fuera del repo.
+- [x] Hook de diagnóstico temporal (`scripts/diagnostics/`) que guarda los payloads fuera del repo.
 - [ ] 🛑 CHECKPOINT: sesiones de prueba en Terminal, Antigravity y Claude Desktop.
 - [ ] Análisis de las capturas y hallazgos en `docs/DECISIONS.md`.
 - [ ] Inventario de solo lectura del vault de Obsidian y de los comandos `memory-load`, `memory-save` y `supabase-switch`.
