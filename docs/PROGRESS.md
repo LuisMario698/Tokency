@@ -31,7 +31,7 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - [x] Hook de diagnóstico temporal (`scripts/diagnostics/`) que guarda los payloads fuera del repo.
 - [ ] 🛑 CHECKPOINT: sesiones de prueba en Terminal, Antigravity y Claude Desktop.
 - [ ] Análisis de las capturas y hallazgos en `docs/DECISIONS.md`.
-- [ ] Inventario de solo lectura del vault de Obsidian y de los comandos `memory-load`, `memory-save` y `supabase-switch`.
+- [x] Inventario de solo lectura del vault de Obsidian y de los comandos `memory-load`, `memory-save` y `supabase-switch`.
 - [ ] Desinstalar el hook de diagnóstico y verificar que `settings.json` quede como estaba.
 - [ ] Borrar las capturas locales (con permiso del usuario).
 - [ ] Push y cierre de la fase.

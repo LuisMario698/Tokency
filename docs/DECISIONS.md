@@ -57,3 +57,9 @@ Registro de decisiones técnicas y de los ajustes a [SPEC.md](SPEC.md). Cada ent
 
 - **Contexto:** el spec indica trabajar en la rama `main`.
 - **Decisión:** commits pequeños directamente en `main`, con push al cerrar cada fase.
+
+## D-009 · Inventario de Obsidian — 2026-09-25
+
+- **Contexto:** el spec supone que `memory-load`, `memory-save` y `supabase-switch` viven en `~/.claude/commands/`.
+- **Hallazgos:** ese directorio no existe; las definiciones están dentro del vault (`claude-commands/`) y hoy ningún comando está activo. Casi todo el vault está sin descargar de iCloud, y las notas de Supabase contienen tokens. Detalle en [OBSIDIAN.md](OBSIDIAN.md).
+- **Decisión:** en la Fase 6 no hay comandos que respaldar en `~/.claude/`. El importador descarga de iCloud antes de leer, nunca copia secretos y los lista en el reporte del `--dry-run`. El destino de `pendientes.md` se decide en la Fase 4.
