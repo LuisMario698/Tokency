@@ -5,7 +5,8 @@
   "description": "Tipos y esquemas compartidos entre los paquetes de Tokency.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./hook-event": "./src/hook-event.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
