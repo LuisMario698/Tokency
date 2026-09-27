@@ -11,7 +11,8 @@ import { openDatabase, schemaVersion } from "./db/database.ts";
 import { MIGRATIONS } from "./db/migrations.ts";
 import { SessionRepository } from "./db/session-repository.ts";
 import { addPasswordCommand } from "./keychain.ts";
-import { renderLaunchAgentPlist } from "./launch-agent.ts";
+import { bootoutAgent, bootstrapAgent, renderLaunchAgentPlist } from "./launch-agent.ts";
+import type { RunResult } from "./process.ts";
 import { createFileLogger, silentLogger } from "./logger.ts";
 import { LAUNCH_AGENT_LABEL, tokencyPaths } from "./paths.ts";
 
@@ -239,5 +240,41 @@ describe("renderLaunchAgentPlist", () => {
     const result = spawnSync("/usr/bin/plutil", ["-lint", file], { encoding: "utf8" });
 
     expect(result.stdout).toContain("OK");
+  });
+});
+
+describe("launchctl", () => {
+  function fakeRunner(codes: Record<string, number[]>) {
+    const calls: string[] = [];
+    const runner = (_file: string, args: readonly string[]): Promise<RunResult> => {
+      const command = args[0] ?? "";
+      calls.push(command);
+      const queue = codes[command] ?? [0];
+      const code = queue.length > 1 ? (queue.shift() ?? 0) : (queue[0] ?? 0);
+      return Promise.resolve({ code, stdout: "", stderr: code === 0 ? "" : "Input/output error" });
+    };
+    return { runner, calls };
+  }
+
+  it("reintenta el bootstrap mientras launchd sigue descargando el servicio anterior", async () => {
+    const { runner, calls } = fakeRunner({ bootstrap: [5, 5, 0] });
+
+    await bootstrapAgent("/x.plist", runner, 0);
+
+    expect(calls).toEqual(["bootstrap", "bootstrap", "bootstrap"]);
+  });
+
+  it("no reintenta otros errores", async () => {
+    const { runner } = fakeRunner({ bootstrap: [1] });
+
+    await expect(bootstrapAgent("/x.plist", runner, 0)).rejects.toThrow(/falló \(1\)/);
+  });
+
+  it("después del bootout espera a que el servicio desaparezca", async () => {
+    // print: cargado, luego sigue cargado dos veces, y al final ya no.
+    const { runner, calls } = fakeRunner({ print: [0, 0, 0, 113] });
+
+    expect(await bootoutAgent("com.tokency.core", runner, 0)).toBe(true);
+    expect(calls).toEqual(["print", "bootout", "print", "print", "print"]);
   });
 });

@@ -62,26 +62,61 @@ function guiDomain(): string {
   return `gui/${String(process.getuid?.() ?? 501)}`;
 }
 
-export async function isAgentLoaded(label: string): Promise<boolean> {
-  const result = await run(LAUNCHCTL, ["print", `${guiDomain()}/${label}`], { timeoutMs: 5_000 });
+type Runner = typeof run;
+
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** Error 5 (EIO) de launchctl: el servicio anterior todavía se está descargando. */
+const BOOTSTRAP_BUSY = 5;
+
+export async function isAgentLoaded(label: string, runner: Runner = run): Promise<boolean> {
+  const result = await runner(LAUNCHCTL, ["print", `${guiDomain()}/${label}`], {
+    timeoutMs: 5_000,
+  });
   return result.code === 0;
 }
 
-export async function bootstrapAgent(plistPath: string): Promise<void> {
-  const result = await run(LAUNCHCTL, ["bootstrap", guiDomain(), plistPath], { timeoutMs: 10_000 });
-  if (result.code !== 0) {
-    throw new Error(`launchctl bootstrap falló (${String(result.code)}): ${result.stderr.trim()}`);
+/** Carga el agente; si launchd sigue descargando el anterior, reintenta unos segundos. */
+export async function bootstrapAgent(
+  plistPath: string,
+  runner: Runner = run,
+  retryDelayMs = 500,
+): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    const result = await runner(LAUNCHCTL, ["bootstrap", guiDomain(), plistPath], {
+      timeoutMs: 10_000,
+    });
+    if (result.code === 0) return;
+    if (result.code !== BOOTSTRAP_BUSY || attempt >= 10) {
+      throw new Error(
+        `launchctl bootstrap falló (${String(result.code)}): ${result.stderr.trim()}`,
+      );
+    }
+    await sleep(retryDelayMs);
   }
 }
 
-/** Descarga el agente si está cargado; no falla si no lo estaba. */
-export async function bootoutAgent(label: string): Promise<boolean> {
-  if (!(await isAgentLoaded(label))) return false;
-  const result = await run(LAUNCHCTL, ["bootout", `${guiDomain()}/${label}`], {
+/**
+ * Descarga el agente si está cargado y espera a que launchd termine; no falla si no estaba.
+ * Sin la espera, un `bootstrap` inmediato falla con el error 5.
+ */
+export async function bootoutAgent(
+  label: string,
+  runner: Runner = run,
+  pollMs = 200,
+): Promise<boolean> {
+  if (!(await isAgentLoaded(label, runner))) return false;
+  const result = await runner(LAUNCHCTL, ["bootout", `${guiDomain()}/${label}`], {
     timeoutMs: 10_000,
   });
   if (result.code !== 0) {
     throw new Error(`launchctl bootout falló (${String(result.code)}): ${result.stderr.trim()}`);
+  }
+  for (let waited = 0; waited < 10_000 && (await isAgentLoaded(label, runner)); waited += pollMs) {
+    await sleep(pollMs);
   }
   return true;
 }
