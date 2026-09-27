@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { installedTokencyHooks, nodeFromCommand } from "./commands/doctor.ts";
 import { buildHookEvent, claudePid, runHook, type HookDeps } from "./commands/hook.ts";
 import { elapsed, formatSession } from "./commands/status.ts";
+import { bar, compactTokens, money, summaryLines } from "./commands/usage.ts";
 import {
   isTokencyHook,
   nodeVersionOk,
@@ -202,5 +203,65 @@ describe("tokency status", () => {
     expect(formatSession(session, 10 * 60_000)).toBe(
       "🟠 esperando  Tokency · com.apple.Terminal · 10 min · «crea el archivo»",
     );
+  });
+});
+
+describe("tokency usage", () => {
+  it("formatea montos, tokens y barras", () => {
+    expect(money(1234.5)).toBe("$1,234.50");
+    expect(compactTokens(950)).toBe("950");
+    expect(compactTokens(12_300)).toBe("12.3 mil");
+    expect(compactTokens(3_400_000)).toBe("3.4 M");
+    expect(bar(0.5, 10)).toBe("█████░░░░░");
+    expect(bar(2, 4)).toBe("████");
+  });
+
+  it("explica la ventana vigente, la cercanía al tope y el último límite", () => {
+    const totals = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      totalTokens: 2_000_000,
+      cost: 25,
+      unpricedTokens: 0,
+      messages: 10,
+    };
+    const lines = summaryLines({
+      generatedAt: 0,
+      timeZone: "UTC",
+      window: {
+        start: Date.UTC(2026, 8, 26, 10),
+        end: Date.UTC(2026, 8, 26, 15),
+        resetsInMs: 90 * 60_000,
+        totals,
+        costByModel: {},
+        burnRatePerHour: 12.5,
+        projectedCost: 43.75,
+        fractionOfCap: 0.5,
+        anchored: false,
+      },
+      today: totals,
+      last7Days: totals,
+      calibration: {
+        estimatedCap: 50,
+        samples: 2,
+        lastLimit: {
+          at: Date.UTC(2026, 8, 25, 6),
+          resetsAt: Date.UTC(2026, 8, 25, 9),
+          kind: "session",
+          source: "transcript",
+        },
+      },
+      sessions: {},
+      unpricedModels: ["modelo-x"],
+      firstEntryAt: 0,
+    });
+
+    expect(lines[0]).toContain("se reinicia en 1 h 30 min");
+    expect(lines[1]).toContain("50 % del tope estimado ($50.00, 2 muestras)");
+    expect(lines[2]).toBe("  ritmo $12.50/h · proyección al cierre $43.75");
+    expect(lines.some((l) => l.startsWith("Último límite alcanzado"))).toBe(true);
+    expect(lines.at(-1)).toContain("modelo-x");
   });
 });

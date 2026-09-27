@@ -246,6 +246,18 @@ describe("historial", () => {
     expect(days[1]?.costByModel["claude-opus-5"]).toBeCloseTo(25);
   });
 
+  it("atribuye cada sesión a la carpeta donde empezó, aunque Claude entre a subcarpetas", () => {
+    const projects = byProject(
+      [
+        entry("a", T0, { cwd: "/x/Tokency", sessionId: "s1" }),
+        entry("b", T0 + 1000, { cwd: "/x/Tokency/apps/mac", sessionId: "s1" }),
+      ],
+      DEFAULT_PRICING,
+    );
+
+    expect(projects.map((p) => [p.project, p.totals.messages])).toEqual([["Tokency", 2]]);
+  });
+
   it("ordena los proyectos por costo y cuenta sus sesiones", () => {
     const projects = byProject(
       [

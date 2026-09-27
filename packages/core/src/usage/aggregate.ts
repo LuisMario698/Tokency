@@ -77,10 +77,24 @@ export function projectOf(entry: UsageEntry): string {
   return entry.cwd === null ? "(sin proyecto)" : path.basename(entry.cwd) || entry.cwd;
 }
 
+/**
+ * Una sesión cuenta para el proyecto donde empezó (el `cwd` de su primer mensaje): Claude
+ * puede entrar después a subcarpetas como `apps/mac`, que no son proyectos aparte.
+ */
+function sessionRoots(entries: readonly UsageEntry[]): Map<string, string> {
+  const first = new Map<string, UsageEntry>();
+  for (const entry of entries) {
+    const known = first.get(entry.sessionId);
+    if (known === undefined || entry.timestamp < known.timestamp) first.set(entry.sessionId, entry);
+  }
+  return new Map([...first].map(([sessionId, entry]) => [sessionId, projectOf(entry)]));
+}
+
 export function byProject(entries: readonly UsageEntry[], pricing: PricingTable): ProjectUsage[] {
+  const roots = sessionRoots(entries);
   const projects = new Map<string, { totals: TokenTotals; sessions: Set<string>; last: number }>();
   for (const entry of entries) {
-    const name = projectOf(entry);
+    const name = roots.get(entry.sessionId) ?? projectOf(entry);
     const project = projects.get(name) ?? { totals: emptyTotals(), sessions: new Set(), last: 0 };
     add(project.totals, entry, pricing);
     project.sessions.add(entry.sessionId);

@@ -12,6 +12,7 @@ Uso: tokency <comando>
   uninstall-hooks       Quita solo los hooks de ~/.claude/settings.json
   doctor                Revisa la instalación y explica cómo arreglarla
   status                Muestra las sesiones de Claude abiertas
+  usage [-d días]       Muestra el uso de Claude Code y el historial
   logs [-n N] [-f]      Muestra el log del core
   serve                 Arranca el core (lo usa launchd)
   hook <evento>         Reenvía un evento de Claude Code al core (lo usan los hooks)
@@ -36,6 +37,8 @@ async function dispatch(command: string | undefined, args: string[]): Promise<nu
       return (await import("./commands/doctor.ts")).doctorCommand();
     case "status":
       return (await import("./commands/status.ts")).statusCommand();
+    case "usage":
+      return (await import("./commands/usage.ts")).usageCommand(args);
     case "logs":
       return (await import("./commands/logs.ts")).logsCommand(args);
     case "--version":
