@@ -191,6 +191,43 @@ do {
     ]) == "claude", "elige el esquema propio y descarta msauth")
 }
 
+// MARK: - Uso
+
+do {
+  let totals = #"{"inputTokens":1,"outputTokens":2,"cacheWriteTokens":3,"cacheReadTokens":4,"totalTokens":10,"cost":27.89,"unpricedTokens":0,"messages":5}"#
+  let json = """
+    {"type":"usage.updated","summary":{"generatedAt":1790478367408,"timeZone":"America/Hermosillo",
+    "window":{"start":1,"end":18000001,"resetsInMs":16427315,"totals":\(totals),"costByModel":{"claude-opus-5-5":27.89},
+    "burnRatePerHour":59.02,"projectedCost":295.1,"fractionOfCap":0.91,"anchored":false},
+    "today":\(totals),"last7Days":\(totals),
+    "calibration":{"estimatedCap":30.61,"samples":2,"lastLimit":{"at":1,"resetsAt":null,"kind":"session","source":"transcript"}},
+    "sessions":{"sess-a":{"totalTokens":10,"cost":1.5}},"unpricedModels":[],"firstEntryAt":null}}
+    """
+  let event = try LiveEvent.decode(SSEMessage(event: "usage.updated", data: json))
+  if case .usage(let summary) = event {
+    check(summary.window?.fractionOfCap == 0.91, "decodifica la ventana vigente")
+    check(summary.calibration.estimatedCap == 30.61 && summary.calibration.lastLimit?.resetsAt == nil, "decodifica la calibración")
+    check(summary.sessions["sess-a"]?.totalTokens == 10, "decodifica el consumo por sesión")
+  } else {
+    check(false, "decodifica usage.updated")
+  }
+  var list = SessionList()
+  list.apply(.snapshot([session("a", .working)]))
+  if case .usage(let summary) = event { list.apply(.usage(summary)) }
+  check(list.visible.map(\.id) == ["a"], "un evento de uso no toca las sesiones")
+
+  check(UsageFormat.money(1234.5) == "$1,234.50", "formatea montos en pesos mexicanos con símbolo de dólar")
+  check(UsageFormat.tokens(950) == "950" && UsageFormat.tokens(12_300) == "12.3 mil", "tokens compactos (mil)")
+  check(UsageFormat.tokens(3_400_000) == "3.4 M" && UsageFormat.tokens(2_000_000) == "2 M", "tokens compactos (millones)")
+  check(UsageFormat.percent(0.874) == "87 %", "porcentaje redondeado")
+  check(UsageFormat.duration(ms: 16_427_315) == "4 h 33 min", "duración hasta el reinicio")
+  check(
+    CapLevel(fraction: nil) == .unknown && CapLevel(fraction: 0.5) == .low && CapLevel(fraction: 0.75) == .medium
+      && CapLevel(fraction: 0.95) == .high, "niveles de la barra de cercanía")
+} catch {
+  check(false, "uso lanzó \(error)")
+}
+
 // MARK: - Resultado
 
 if failures.isEmpty {

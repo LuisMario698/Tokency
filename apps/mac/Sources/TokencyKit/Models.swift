@@ -84,10 +84,12 @@ public enum LiveEvent: Sendable, Equatable {
   case snapshot([Session])
   case updated(Session)
   case removed(String)
+  case usage(UsageSummary)
 
   private struct SnapshotPayload: Decodable { let sessions: [Session] }
   private struct UpdatedPayload: Decodable { let session: Session }
   private struct RemovedPayload: Decodable { let id: String }
+  private struct UsagePayload: Decodable { let summary: UsageSummary }
 
   /// Decodifica un mensaje SSE; devuelve `nil` para `ping` y eventos desconocidos.
   public static func decode(_ message: SSEMessage) throws -> LiveEvent? {
@@ -97,6 +99,7 @@ public enum LiveEvent: Sendable, Equatable {
     case "snapshot": return .snapshot(try decoder.decode(SnapshotPayload.self, from: data).sessions)
     case "session.updated": return .updated(try decoder.decode(UpdatedPayload.self, from: data).session)
     case "session.removed": return .removed(try decoder.decode(RemovedPayload.self, from: data).id)
+    case "usage.updated": return .usage(try decoder.decode(UsagePayload.self, from: data).summary)
     default: return nil
     }
   }
@@ -116,6 +119,8 @@ public struct SessionList: Sendable, Equatable {
       byId[session.id] = session
     case .removed(let id):
       byId[id] = nil
+    case .usage:
+      return
     }
     // Las terminadas no se muestran: su banda desaparece.
     byId = byId.filter { $0.value.state != .ended }

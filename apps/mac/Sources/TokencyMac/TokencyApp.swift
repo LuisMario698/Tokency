@@ -12,6 +12,11 @@ struct TokencyApp: App {
       MenuBarLabel(model: delegate.model)
     }
     .menuBarExtraStyle(.window)
+
+    Window("Historial de uso", id: UsageHistoryView.windowID) {
+      UsageHistoryView(model: delegate.model, history: delegate.model.history)
+    }
+    .defaultSize(width: 760, height: 720)
   }
 }
 

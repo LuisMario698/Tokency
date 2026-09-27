@@ -24,7 +24,9 @@ struct BandsView: View {
   var body: some View {
     VStack(spacing: model.gap) {
       ForEach(model.sessions) { session in
-        BandRow(session: session, expanded: model.expanded, edge: model.edge, height: model.bandHeight)
+        BandRow(
+          session: session, usage: model.usage[session.sessionId], expanded: model.expanded, edge: model.edge,
+          height: model.bandHeight)
           .contentShape(Rectangle())
           .onTapGesture { onTap(session) }
           .help(session.title)
@@ -36,6 +38,7 @@ struct BandsView: View {
 
 private struct BandRow: View {
   let session: Session
+  let usage: SessionUsage?
   let expanded: Bool
   let edge: BandEdge
   let height: CGFloat
@@ -63,7 +66,7 @@ private struct BandRow: View {
           Text(session.state.label).font(.system(size: 10, weight: .medium)).opacity(0.85)
         }
         if height >= 36 {
-          Text("\(SystemActions.originLabel(session)) · \(elapsedLabel(since: session.startedDate, now: context.date))")
+          Text(detailLine(now: context.date))
             .font(.system(size: 10)).opacity(0.85).lineLimit(1)
         }
         if height >= 52, let prompt = session.lastPrompt {
@@ -72,6 +75,13 @@ private struct BandRow: View {
       }
       .foregroundStyle(.white)
     }
+  }
+
+  /// Origen, tiempo y, si hay datos, tokens de la sesión (spec §4.9).
+  private func detailLine(now: Date) -> String {
+    var parts = [SystemActions.originLabel(session), elapsedLabel(since: session.startedDate, now: now)]
+    if let usage { parts.append("\(UsageFormat.tokens(usage.totalTokens)) tokens") }
+    return parts.joined(separator: " · ")
   }
 }
 
@@ -97,6 +107,8 @@ struct MenuView: View {
       header
       Divider()
       sessionsList
+      Divider()
+      UsageMenuSection(model: model)
       Divider()
       settings
       Divider()

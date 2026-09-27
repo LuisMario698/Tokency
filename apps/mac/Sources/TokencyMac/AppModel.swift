@@ -12,6 +12,9 @@ final class AppModel: ObservableObject {
   }
 
   @Published private(set) var sessions: [Session] = []
+  /// Último resumen de uso recibido por SSE; `nil` hasta que llega el primero.
+  @Published private(set) var usage: UsageSummary?
+  @Published private(set) var usageMessage: String?
   @Published private(set) var connection: Connection = .connecting
   @Published private(set) var loginItemEnabled = LoginItem.isEnabled
   @Published private(set) var loginItemNeedsApproval = LoginItem.needsApproval
@@ -29,6 +32,7 @@ final class AppModel: ObservableObject {
   }
 
   let bands = BandsController()
+  let history = UsageHistoryModel()
   private let defaults = UserDefaults.standard
   private var list = SessionList()
   private var loop: Task<Void, Never>?
@@ -52,9 +56,20 @@ final class AppModel: ObservableObject {
       do {
         let endpoint = try await Task.detached { try CoreSettings.endpoint() }.value
         for try await event in CoreEventStream.events(endpoint: endpoint) {
-          if case .snapshot = event {
+          switch event {
+          case .snapshot:
             connection = .connected
             delay = .seconds(1)
+          case .usage(let summary):
+            usage = summary
+            bands.updateUsage(summary.sessions)
+            if ProcessInfo.processInfo.environment["TOKENCY_DEBUG"] == "1" {
+              let line = "uso: ventana \(summary.window.map { UsageFormat.money($0.totals.cost) } ?? "-"), tope \(summary.calibration.estimatedCap.map(UsageFormat.money) ?? "-")\n"
+              FileHandle.standardError.write(Data(line.utf8))
+            }
+            continue
+          default:
+            break
           }
           list.apply(event)
           publish()
@@ -93,6 +108,27 @@ final class AppModel: ObservableObject {
 
   func activate(_ session: Session) {
     SystemActions.focus(session)
+  }
+
+  /// Cliente para las consultas del historial; `nil` si no hay token.
+  func api() async -> CoreAPI? {
+    guard let endpoint = try? await Task.detached(operation: { try CoreSettings.endpoint() }).value else {
+      return nil
+    }
+    return CoreAPI(endpoint: endpoint)
+  }
+
+  /// Botón "Llegué al límite": una muestra más para estimar el tope (D-015).
+  func markLimitHit() {
+    Task {
+      do {
+        guard let api = await api() else { throw CoreSettingsError.missingToken }
+        usage = try await api.markLimitHit()
+        usageMessage = "Anotado. La estimación del tope se actualizó."
+      } catch {
+        usageMessage = "No se pudo anotar: \((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)"
+      }
+    }
   }
 
   func restartCore() {

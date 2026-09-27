@@ -6,6 +6,8 @@ import TokencyKit
 @MainActor
 final class BandsViewModel: ObservableObject {
   @Published var sessions: [Session] = []
+  /// Consumo de las últimas 24 h por `sessionId`.
+  @Published var usage: [String: SessionUsage] = [:]
   @Published var expanded = false
   @Published var edge: BandEdge = .right
   @Published var bandHeight: CGFloat = BandMetrics().bandHeight
@@ -77,6 +79,10 @@ final class BandsController {
     ) { [weak self] _ in
       MainActor.assumeIsolated { self?.relayout() }
     }
+  }
+
+  func updateUsage(_ usage: [String: SessionUsage]) {
+    model.usage = usage
   }
 
   func update(sessions: [Session], visible: Bool, edge: BandEdge) {
