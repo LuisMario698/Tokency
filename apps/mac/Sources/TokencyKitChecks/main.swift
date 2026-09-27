@@ -108,9 +108,9 @@ do {
   let metrics = BandMetrics()
   let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
   let one = BandLayout.panelFrame(visibleFrame: screen, edge: .right, count: 1, expanded: false, metrics: metrics)
-  check(one == CGRect(x: 1433, y: 418, width: 7, height: 64), "una banda colapsada, a la derecha y centrada")
+  check(one == CGRect(x: 1427, y: 412, width: 13, height: 76), "una banda colapsada, a la derecha, centrada y con margen para el brillo")
   let expanded = BandLayout.panelFrame(visibleFrame: screen, edge: .left, count: 2, expanded: true, metrics: metrics)
-  check(expanded == CGRect(x: 0, y: 384, width: 320, height: 132), "dos bandas expandidas a la izquierda")
+  check(expanded == CGRect(x: 0, y: 378, width: 326, height: 144), "dos bandas expandidas a la izquierda")
   let many = BandLayout.bandHeight(count: 20, available: 900, metrics: metrics)
   check(many < metrics.bandHeight && many >= metrics.minBandHeight, "muchas bandas se achican para caber")
   let tooMany = BandLayout.bandHeight(count: 200, available: 900, metrics: metrics)
@@ -197,6 +197,7 @@ do {
   let totals = #"{"inputTokens":1,"outputTokens":2,"cacheWriteTokens":3,"cacheReadTokens":4,"totalTokens":10,"cost":27.89,"unpricedTokens":0,"messages":5}"#
   let json = """
     {"type":"usage.updated","summary":{"generatedAt":1790478367408,"timeZone":"America/Hermosillo",
+    "plan":{"fiveHour":{"usedPercentage":40,"resetsAt":1790485800000,"observedAt":1790477000000,"estimatedNow":46.5,"estimated":true},"sevenDay":null},
     "window":{"start":1,"end":18000001,"resetsInMs":16427315,"totals":\(totals),"costByModel":{"claude-opus-5-5":27.89},
     "burnRatePerHour":59.02,"projectedCost":295.1,"fractionOfCap":0.91,"anchored":false},
     "today":\(totals),"last7Days":\(totals),
@@ -208,6 +209,8 @@ do {
     check(summary.window?.fractionOfCap == 0.91, "decodifica la ventana vigente")
     check(summary.calibration.estimatedCap == 30.61 && summary.calibration.lastLimit?.resetsAt == nil, "decodifica la calibración")
     check(summary.sessions["sess-a"]?.totalTokens == 10, "decodifica el consumo por sesión")
+    check(summary.plan?.fiveHour?.displayPercentage == 46.5 && summary.plan?.sevenDay == nil, "decodifica el uso oficial del plan")
+    check(summary.plan?.fiveHour?.usedPercentage == 40, "conserva el dato oficial junto a la proyección")
   } else {
     check(false, "decodifica usage.updated")
   }
@@ -224,6 +227,19 @@ do {
   check(
     CapLevel(fraction: nil) == .unknown && CapLevel(fraction: 0.5) == .low && CapLevel(fraction: 0.75) == .medium
       && CapLevel(fraction: 0.95) == .high, "niveles de la barra de cercanía")
+  let official = PlanLimit(usedPercentage: 40, resetsAt: 0, observedAt: 0, estimatedNow: 40, estimated: false)
+  check(official.displayPercentage == 40, "sin consumo posterior se muestra el dato oficial")
+  check(CapLevel(percentage: 75) == .medium && CapLevel(percentage: 95) == .high, "niveles con porcentaje de 0 a 100")
+
+  let withMetrics = try JSONDecoder().decode(
+    Session.self,
+    from: Data(
+      sessionJSON("m", "working").replacingOccurrences(
+        of: "\"campoNuevo\":true",
+        with: "\"metrics\":{\"costUsd\":3.21,\"contextUsedPercentage\":34,\"contextInputTokens\":340000,\"sessionName\":\"parser\",\"modelName\":\"Opus 5.5\",\"updatedAt\":1}"
+      ).utf8))
+  check(withMetrics.metrics?.costUsd == 3.21 && withMetrics.title == "parser", "decodifica las métricas oficiales de la sesión")
+  check(withMetrics.project == "repo", "el proyecto se conserva aparte del nombre de la sesión")
 } catch {
   check(false, "uso lanzó \(error)")
 }

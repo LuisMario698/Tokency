@@ -146,10 +146,11 @@ final class AppModel: ObservableObject {
     loginItemNeedsApproval = LoginItem.needsApproval
   }
 
-  /// Ícono de la barra de menús según la sesión más urgente.
+  /// Ícono de la barra de menús: el límite oficial si está alto; si no, la sesión más urgente.
   var menuBarSymbol: String {
     let states = Set(sessions.map(\.state))
     if case .unavailable = connection { return "exclamationmark.triangle" }
+    if let five = usage?.plan?.fiveHour, five.displayPercentage >= 90 { return "gauge.with.dots.needle.100percent" }
     if states.contains(.waiting) { return "exclamationmark.circle.fill" }
     if states.contains(.working) { return "circle.dotted.circle" }
     if states.contains(.done) { return "checkmark.circle" }

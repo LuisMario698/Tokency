@@ -16,6 +16,8 @@ public struct BandMetrics: Sendable, Equatable {
   public var gap: CGFloat = 4
   /// Fracción máxima de la altura de la pantalla que ocupan las bandas.
   public var maxHeightFraction: CGFloat = 0.7
+  /// Margen para el brillo neón: del lado interior y arriba y abajo, nunca contra el borde.
+  public var glow: CGFloat = 6
 
   public init() {}
 }
@@ -37,8 +39,9 @@ public enum BandLayout {
   ) -> CGRect {
     guard count > 0 else { return .zero }
     let height = bandHeight(count: count, available: visibleFrame.height, metrics: metrics)
-    let total = CGFloat(count) * height + CGFloat(count - 1) * metrics.gap
-    let width = expanded ? metrics.expandedWidth : metrics.collapsedWidth
+    let bands = CGFloat(count) * height + CGFloat(count - 1) * metrics.gap
+    let width = (expanded ? metrics.expandedWidth : metrics.collapsedWidth) + metrics.glow
+    let total = bands + 2 * metrics.glow
     let x = edge == .right ? visibleFrame.maxX - width : visibleFrame.minX
     let y = (visibleFrame.midY - total / 2).rounded(.down)
     return CGRect(x: x, y: y, width: width, height: total)

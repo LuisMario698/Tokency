@@ -34,6 +34,28 @@ public struct SessionOrigin: Codable, Sendable, Equatable {
   }
 }
 
+/// Métricas oficiales de la status line: costo de la sesión según Claude Code y contexto.
+public struct SessionMetrics: Codable, Sendable, Equatable {
+  public var costUsd: Double?
+  public var contextUsedPercentage: Double?
+  public var contextInputTokens: Int?
+  public var sessionName: String?
+  public var modelName: String?
+  public var updatedAt: Double
+
+  public init(
+    costUsd: Double? = nil, contextUsedPercentage: Double? = nil, contextInputTokens: Int? = nil,
+    sessionName: String? = nil, modelName: String? = nil, updatedAt: Double
+  ) {
+    self.costUsd = costUsd
+    self.contextUsedPercentage = contextUsedPercentage
+    self.contextInputTokens = contextInputTokens
+    self.sessionName = sessionName
+    self.modelName = modelName
+    self.updatedAt = updatedAt
+  }
+}
+
 /// Subconjunto de la sesión del core que usa la app; los demás campos se ignoran.
 public struct Session: Codable, Sendable, Equatable, Identifiable {
   public var id: String
@@ -48,6 +70,8 @@ public struct Session: Codable, Sendable, Equatable, Identifiable {
   public var tty: String?
   public var model: String?
   public var lastPrompt: String?
+  /// Solo en sesiones de terminal, donde corre la status line.
+  public var metrics: SessionMetrics?
   /// Milisegundos desde epoch, como en el core.
   public var startedAt: Double
   public var stateChangedAt: Double
@@ -56,7 +80,7 @@ public struct Session: Codable, Sendable, Equatable, Identifiable {
   public init(
     id: String, sessionId: String, pid: Int? = nil, state: SessionState, origin: SessionOrigin,
     cwd: String? = nil, projectName: String? = nil, projectDir: String? = nil, tty: String? = nil,
-    model: String? = nil, lastPrompt: String? = nil,
+    model: String? = nil, lastPrompt: String? = nil, metrics: SessionMetrics? = nil,
     startedAt: Double, stateChangedAt: Double, lastActivityAt: Double
   ) {
     self.id = id
@@ -70,13 +94,15 @@ public struct Session: Codable, Sendable, Equatable, Identifiable {
     self.tty = tty
     self.model = model
     self.lastPrompt = lastPrompt
+    self.metrics = metrics
     self.startedAt = startedAt
     self.stateChangedAt = stateChangedAt
     self.lastActivityAt = lastActivityAt
   }
 
   public var startedDate: Date { Date(timeIntervalSince1970: startedAt / 1000) }
-  public var title: String { projectName ?? "Sin proyecto" }
+  public var title: String { metrics?.sessionName ?? projectName ?? "Sin proyecto" }
+  public var project: String { projectName ?? "Sin proyecto" }
 }
 
 /// Eventos de `GET /v1/events` (`liveEventSchema` en el core).

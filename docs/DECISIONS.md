@@ -176,3 +176,21 @@ Dos variables de entorno que el hook hereda bastan; no hace falta recorrer la ca
 
 - **Recargos:** el modo rápido (`speed: "fast"`) multiplica por 2 en Opus 5 y Opus 5.5; las búsquedas web cuestan $10 por cada 1000. Las escrituras en caché de Opus 5.5 son derivadas (1,25× y 2×) y la referencia pide confirmarlas tras su lanzamiento.
 - **Edición:** `config.json` acepta `pricing`, que se combina con la tabla por defecto modelo por modelo. Si un modelo no tiene precio, su costo queda sin calcular y la app lo avisa.
+
+## D-017 · Uso oficial del plan desde la status line — 2026-09-26
+
+- **Contexto:** el usuario pidió que el uso fuera exacto. El conteo de tokens ya coincidía al mensaje con los JSONL, pero el porcentaje del límite se estimaba con solo dos muestras y no coincidía con el que muestra Claude. La documentación vigente de la [status line](https://code.claude.com/docs/en/statusline) indica que Claude Code le entrega `rate_limits.five_hour` y `rate_limits.seven_day`, con `used_percentage` y `resets_at`, a los suscriptores de Pro y Max. Es la única fuente oficial del uso del plan: OpenTelemetry exporta tokens y costo, pero no límites.
+- **Decisión:**
+  - `tokency install` agrega una status line propia (`tokency statusline`). Nunca reemplaza una del usuario: si ya existe, la conserva, lo avisa y `doctor` lo reporta.
+  - El comando imprime la línea en colores neón (porcentaje oficial de 5 horas y de la semana con su reinicio, costo y contexto de la sesión) y después manda el snapshot saneado al core (`POST /v1/statusline`).
+  - El core guarda cada cambio del dato oficial en `plan_snapshots`.
+  - **Ventanas:** el reinicio oficial fija la ventana de 5 horas con certeza.
+  - **Porcentaje:** se muestra el oficial. Si hubo consumo después del último dato, se proyecta con el costo por punto de esa misma ventana y se marca "≈ estimado".
+  - **Calibración:** cada ventana con dato oficial aporta una muestra (costo ÷ porcentaje), mucho más fina que esperar a llegar al límite.
+  - **Por sesión:** se muestran el costo que calcula el propio Claude Code (`cost.total_cost_usd`) y el uso de contexto.
+- **Limitación:** la status line es un ajuste de "interfaz y terminal", así que el dato oficial llega de las sesiones en la terminal. Si solo se usa la extensión de Antigravity, el porcentaje se proyecta desde el último dato oficial. Queda por validar si la vista gráfica de la extensión la ejecuta.
+
+## D-018 · Estilo neón — 2026-09-26
+
+- **Decisión (del usuario):** la app y la status line usan una paleta neón sobre fondo índigo casi negro: magenta, cian, verde, ámbar, rosa y violeta. Los estados de sesión conservan el significado del spec (azul, ámbar, verde y gris), en versión neón y con brillo. Los niveles del plan usan los mismos cortes en la terminal y en la app: cian hasta 70 %, ámbar hasta 90 % y rosa desde ahí.
+- **Consecuencia:** el panel de bandas reserva un margen de 6 pt para el brillo, solo del lado interior y arriba y abajo, así la banda sigue pegada al borde de la pantalla.

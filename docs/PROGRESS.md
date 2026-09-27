@@ -201,3 +201,7 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - Revisión visual del usuario: sección de uso del menú, ventana de historial y tokens en las bandas.
 - La estimación del tope parte de solo dos muestras; se afina con cada límite alcanzado.
 - Del cierre de la Fase 1 siguen pendientes la prueba de reinicio de la Mac y los eventos sin validar de D-010.
+
+### Ampliación — uso oficial y estilo neón (2026-09-26)
+
+A pedido del usuario ("que sea completamente exacto"), el uso del plan se lee de la fuente oficial: la status line de Claude Code (D-017). La app, las bandas y la status line pasan a un estilo neón (D-018). Para activarlo, el usuario reinstala con `tokency install`, que agrega la status line a `settings.json`.

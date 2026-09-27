@@ -50,9 +50,38 @@ public struct SessionUsage: Codable, Sendable, Equatable {
   public var cost: Double
 }
 
+/// Porcentaje oficial de un límite del plan, de la status line de Claude Code (D-017).
+public struct PlanLimit: Codable, Sendable, Equatable {
+  public var usedPercentage: Double
+  public var resetsAt: Double
+  public var observedAt: Double
+  /// Proyección a este momento con el consumo posterior al dato oficial.
+  public var estimatedNow: Double
+  public var estimated: Bool
+
+  public init(usedPercentage: Double, resetsAt: Double, observedAt: Double, estimatedNow: Double, estimated: Bool) {
+    self.usedPercentage = usedPercentage
+    self.resetsAt = resetsAt
+    self.observedAt = observedAt
+    self.estimatedNow = estimatedNow
+    self.estimated = estimated
+  }
+
+  /// Lo que conviene mostrar: la proyección si la hay, el dato oficial si no.
+  public var displayPercentage: Double { estimated ? estimatedNow : usedPercentage }
+  public var resetsDate: Date { Date(timeIntervalSince1970: resetsAt / 1000) }
+}
+
+public struct PlanUsage: Codable, Sendable, Equatable {
+  public var fiveHour: PlanLimit?
+  public var sevenDay: PlanLimit?
+}
+
 public struct UsageSummary: Codable, Sendable, Equatable {
   public var generatedAt: Double
   public var timeZone: String
+  /// Uso oficial del plan; `nil` si todavía no llegó ningún dato de la status line.
+  public var plan: PlanUsage?
   public var window: ActiveWindow?
   public var today: TokenTotals
   public var last7Days: TokenTotals
@@ -97,6 +126,11 @@ public enum CapLevel: Sendable, Equatable {
       return
     }
     self = fraction >= 0.9 ? .high : fraction >= 0.7 ? .medium : .low
+  }
+
+  /// Mismos cortes con un porcentaje de 0 a 100 (como la status line de la terminal).
+  public init(percentage: Double?) {
+    self.init(fraction: percentage.map { $0 / 100 })
   }
 }
 

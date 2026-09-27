@@ -12,6 +12,7 @@ final class BandsViewModel: ObservableObject {
   @Published var edge: BandEdge = .right
   @Published var bandHeight: CGFloat = BandMetrics().bandHeight
   let gap = BandMetrics().gap
+  let glow = BandMetrics().glow
 }
 
 /// Vista raíz del panel: avisa cuando el mouse entra o sale, aunque la app no esté activa.

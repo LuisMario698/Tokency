@@ -3,47 +3,91 @@ import Charts
 import SwiftUI
 import TokencyKit
 
-extension CapLevel {
-  var color: Color {
-    switch self {
-    case .unknown: .secondary
-    case .low: .green
-    case .medium: .orange
-    case .high: .red
-    }
-  }
+private func resetLabel(_ date: Date) -> String {
+  let formatter = DateFormatter()
+  formatter.locale = Locale(identifier: "es_MX")
+  formatter.dateFormat = Calendar.current.isDateInToday(date) ? "'hoy' HH:mm" : "EEE d, HH:mm"
+  return formatter.string(from: date)
 }
 
-/// Aviso fijo del spec §4.3: siempre se muestra que es una estimación parcial.
+private func ago(_ ms: Double, now: Date) -> String {
+  UsageFormat.duration(ms: max(0, now.timeIntervalSince1970 * 1000 - ms))
+}
+
+/// Aviso fijo: qué es oficial y qué es estimado (spec §4.3, D-017).
 struct EstimateNote: View {
+  let hasOfficial: Bool
+
   var body: some View {
-    Text("Estimación: solo Claude Code en esta Mac. El chat de claude.ai comparte el límite pero no se ve aquí.")
-      .font(.caption2)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
+    Text(
+      hasOfficial
+        ? "El porcentaje es el oficial de Claude (status line). Entre un dato y otro se proyecta con el consumo local. Los montos son el equivalente en la API."
+        : "Sin dato oficial todavía: abre Claude Code en la terminal para recibirlo. Mientras tanto, todo es una estimación que solo cubre Claude Code en esta Mac."
+    )
+    .font(.caption2)
+    .foregroundStyle(Neon.dim)
+    .fixedSize(horizontal: false, vertical: true)
   }
 }
 
-/// Barra de cercanía al tope estimado de la ventana de 5 horas.
-struct CapBar: View {
-  let fraction: Double?
+/// Un límite oficial del plan: barra neón, porcentaje, reinicio y frescura del dato.
+struct PlanLimitRow: View {
+  let label: String
+  let limit: PlanLimit
 
   var body: some View {
-    let level = CapLevel(fraction: fraction)
-    GeometryReader { geometry in
-      ZStack(alignment: .leading) {
-        Capsule().fill(Color.secondary.opacity(0.2))
-        Capsule()
-          .fill(level.color)
-          .frame(width: geometry.size.width * min(max(fraction ?? 0, 0), 1))
+    TimelineView(.periodic(from: .now, by: 30)) { context in
+      let percentage = limit.displayPercentage
+      let color = CapLevel(percentage: percentage).neon
+      VStack(alignment: .leading, spacing: 5) {
+        HStack(alignment: .firstTextBaseline) {
+          Text(label).font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Neon.text)
+          NeonBadge(text: limit.estimated ? "≈ estimado" : "oficial", color: limit.estimated ? Neon.amber : Neon.green)
+          Spacer()
+          Text("\(Int(percentage.rounded())) %")
+            .font(.system(size: 20, weight: .black, design: .rounded)).monospacedDigit()
+            .foregroundStyle(color).neonGlow(color, radius: 6)
+        }
+        NeonBar(fraction: percentage / 100, color: color)
+        HStack {
+          Text("se reinicia \(resetLabel(limit.resetsDate))")
+          Spacer()
+          Text(
+            limit.estimated
+              ? "oficial \(Int(limit.usedPercentage.rounded())) % hace \(ago(limit.observedAt, now: context.date))"
+              : "dato de hace \(ago(limit.observedAt, now: context.date))")
+        }
+        .font(.caption2)
+        .foregroundStyle(Neon.dim)
       }
     }
-    .frame(height: 6)
-    .accessibilityLabel(fraction.map { "\(UsageFormat.percent($0)) del tope estimado" } ?? "Sin calibrar")
   }
 }
 
-/// Resumen de la ventana vigente; se usa en el menú y en la ventana de historial.
+/// Uso oficial del plan: sesión de 5 horas y semana.
+struct PlanCard: View {
+  let summary: UsageSummary
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      if let five = summary.plan?.fiveHour {
+        PlanLimitRow(label: "Sesión de 5 horas", limit: five)
+      }
+      if let week = summary.plan?.sevenDay {
+        PlanLimitRow(label: "Semana", limit: week)
+      }
+      if summary.plan == nil {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Uso oficial del plan").font(.system(size: 11, weight: .bold, design: .rounded))
+          Text("Todavía no llega: lo manda la status line de Tokency al usar Claude Code en la terminal.")
+            .font(.caption2).foregroundStyle(Neon.dim)
+        }
+      }
+    }
+  }
+}
+
+/// Consumo local de la ventana de 5 horas: costo equivalente, ritmo y proyección.
 struct WindowCard: View {
   let summary: UsageSummary
 
@@ -51,27 +95,28 @@ struct WindowCard: View {
     VStack(alignment: .leading, spacing: 5) {
       if let window = summary.window {
         HStack {
-          Text("Ventana de 5 horas").font(.caption.weight(.semibold))
+          Text("Consumo de la ventana").font(.system(size: 11, weight: .bold, design: .rounded))
           Spacer()
-          Text("se reinicia en \(UsageFormat.duration(ms: window.resetsInMs))").font(.caption).foregroundStyle(.secondary)
+          Text(UsageFormat.money(window.totals.cost))
+            .font(.system(size: 14, weight: .heavy, design: .rounded)).foregroundStyle(Neon.green)
+            .neonGlow(Neon.green, radius: 4)
         }
-        CapBar(fraction: window.fractionOfCap)
-        HStack {
-          Text("\(UsageFormat.money(window.totals.cost)) equivalentes")
-          Spacer()
-          if let fraction = window.fractionOfCap, let cap = summary.calibration.estimatedCap {
-            Text("\(UsageFormat.percent(fraction)) de ~\(UsageFormat.money(cap))")
-              .foregroundStyle(CapLevel(fraction: fraction).color)
-          } else {
-            Text("sin calibrar").foregroundStyle(.secondary)
-          }
+        if summary.plan?.fiveHour == nil {
+          // Sin dato oficial, la cercanía al límite solo puede estimarse con la calibración.
+          let level = CapLevel(fraction: window.fractionOfCap)
+          NeonBar(fraction: window.fractionOfCap ?? 0, color: level.neon, height: 6)
+          Text(
+            window.fractionOfCap.map { "≈ \(UsageFormat.percent($0)) del tope estimado" }
+              ?? "Sin calibrar: marca «Llegué al límite» cuando te pase")
+            .font(.caption2).foregroundStyle(level.neon)
         }
-        .font(.caption)
-        Text("Ritmo \(UsageFormat.money(window.burnRatePerHour))/h · al cierre ~\(UsageFormat.money(window.projectedCost))")
-          .font(.caption2).foregroundStyle(.secondary)
+        Text(
+          "\(UsageFormat.tokens(window.totals.totalTokens)) tokens · ritmo \(UsageFormat.money(window.burnRatePerHour))/h · al cierre ~\(UsageFormat.money(window.projectedCost))"
+        )
+        .font(.caption2).foregroundStyle(Neon.dim)
       } else {
-        Text("Ventana de 5 horas: ninguna abierta").font(.caption.weight(.semibold))
-        Text("Empieza con tu próximo mensaje.").font(.caption).foregroundStyle(.secondary)
+        Text("Sin ventana de 5 horas abierta: empieza con tu próximo mensaje.")
+          .font(.caption2).foregroundStyle(Neon.dim)
       }
     }
   }
@@ -83,20 +128,24 @@ struct UsageMenuSection: View {
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 10) {
+      Text("USO DEL PLAN").font(.system(size: 10, weight: .heavy, design: .rounded)).kerning(1).foregroundStyle(Neon.cyan)
       if let summary = model.usage {
+        PlanCard(summary: summary)
+        Divider().overlay(Neon.magenta.opacity(0.3))
         WindowCard(summary: summary)
         HStack {
           Text("Hoy \(UsageFormat.money(summary.today.cost))")
           Spacer()
           Text("7 días \(UsageFormat.money(summary.last7Days.cost))")
         }
-        .font(.caption)
+        .font(.system(size: 10, weight: .semibold, design: .rounded))
+        .foregroundStyle(Neon.violet)
         if !summary.unpricedModels.isEmpty {
-          Text("Sin precio: \(summary.unpricedModels.joined(separator: ", "))").font(.caption2).foregroundStyle(.orange)
+          Text("Sin precio: \(summary.unpricedModels.joined(separator: ", "))").font(.caption2).foregroundStyle(Neon.amber)
         }
       } else {
-        Text("Leyendo el historial de uso…").font(.caption).foregroundStyle(.secondary)
+        Text("Leyendo el historial de uso…").font(.caption).foregroundStyle(Neon.dim)
       }
       HStack {
         Button("Llegué al límite") { model.markLimitHit() }
@@ -107,11 +156,13 @@ struct UsageMenuSection: View {
           NSApp.activate()
         }
       }
+      .controlSize(.small)
       if let message = model.usageMessage {
-        Text(message).font(.caption2).foregroundStyle(.secondary)
+        Text(message).font(.caption2).foregroundStyle(Neon.dim)
       }
-      EstimateNote()
+      EstimateNote(hasOfficial: model.usage?.plan != nil)
     }
+    .neonCard()
   }
 }
 
@@ -120,71 +171,86 @@ struct UsageMenuSection: View {
 struct UsageHistoryView: View {
   static let windowID = "usage-history"
 
-
   @ObservedObject var model: AppModel
   @ObservedObject var history: UsageHistoryModel
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
-        header
-        if let error = history.error {
-          Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+        title
+        HStack(alignment: .top, spacing: 16) {
+          if let summary = model.usage {
+            VStack(alignment: .leading, spacing: 12) {
+              PlanCard(summary: summary)
+              Divider().overlay(Neon.magenta.opacity(0.3))
+              WindowCard(summary: summary)
+            }
+            .frame(maxWidth: 380)
+            .neonCard(padding: 16)
+          }
+          controls
         }
-        chart
-        projectsTable
-        windowsList
+        if let error = history.error {
+          Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(Neon.amber)
+        }
+        chart.neonCard(padding: 16)
+        projectsTable.neonCard(padding: 16)
+        windowsList.neonCard(padding: 16)
         footer
       }
-      .padding(20)
+      .padding(22)
     }
-    .frame(minWidth: 640, minHeight: 560)
+    .frame(minWidth: 720, minHeight: 620)
+    .background(Neon.background)
+    .foregroundStyle(Neon.text)
+    .tint(Neon.magenta)
+    .environment(\.colorScheme, .dark)
     .onAppear { history.reload(using: model) }
     .onChange(of: history.days) { _, _ in history.reload(using: model) }
     .onChange(of: model.usage?.generatedAt) { _, _ in history.reload(using: model) }
   }
 
-  private var header: some View {
-    HStack(alignment: .top, spacing: 20) {
-      VStack(alignment: .leading, spacing: 8) {
-        if let summary = model.usage {
-          WindowCard(summary: summary).frame(maxWidth: 360)
-          calibrationText(summary)
-        }
-        EstimateNote().frame(maxWidth: 360, alignment: .leading)
-      }
+  private var title: some View {
+    HStack(alignment: .firstTextBaseline) {
+      Text("◆ HISTORIAL DE USO")
+        .font(.system(size: 22, weight: .black, design: .rounded)).kerning(2)
+        .foregroundStyle(Neon.magenta).neonGlow(Neon.magenta, radius: 8)
       Spacer()
-      VStack(alignment: .trailing, spacing: 8) {
-        Picker("Periodo", selection: $history.days) {
-          Text("7 días").tag(7)
-          Text("14 días").tag(14)
-          Text("30 días").tag(30)
-          Text("90 días").tag(90)
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 280)
-        Picker("Métrica", selection: $history.metric) {
-          ForEach(UsageHistoryModel.Metric.allCases) { Text($0.rawValue).tag($0) }
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 280)
-        Button("Llegué al límite") { model.markLimitHit() }
-        Link("Ver el uso oficial de tu cuenta", destination: officialUsageURL).font(.caption)
-      }
+      Link("Uso oficial de tu cuenta ↗", destination: officialUsageURL).font(.caption).foregroundStyle(Neon.cyan)
     }
+  }
+
+  private var controls: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Picker("Periodo", selection: $history.days) {
+        Text("7 días").tag(7)
+        Text("14 días").tag(14)
+        Text("30 días").tag(30)
+        Text("90 días").tag(90)
+      }
+      .pickerStyle(.segmented)
+      Picker("Métrica", selection: $history.metric) {
+        ForEach(UsageHistoryModel.Metric.allCases) { Text($0.rawValue).tag($0) }
+      }
+      .pickerStyle(.segmented)
+      if let summary = model.usage {
+        calibrationText(summary)
+      }
+      Button("Llegué al límite") { model.markLimitHit() }
+      EstimateNote(hasOfficial: model.usage?.plan != nil)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private func calibrationText(_ summary: UsageSummary) -> some View {
     let calibration = summary.calibration
     let text: String
     if let cap = calibration.estimatedCap {
-      text =
-        "Tope estimado: ~\(UsageFormat.money(cap)) por ventana, a partir de \(calibration.samples) "
-        + (calibration.samples == 1 ? "límite alcanzado." : "límites alcanzados.")
+      text = "Una sesión de 5 horas aguanta ~\(UsageFormat.money(cap)) equivalentes (\(calibration.samples) muestras)."
     } else {
-      text = "Sin calibrar todavía: cuando llegues al límite, Tokency lo detecta solo o puedes marcarlo con el botón."
+      text = "Sin calibrar todavía."
     }
-    return Text(text).font(.caption).foregroundStyle(.secondary).frame(maxWidth: 360, alignment: .leading)
+    return Text(text).font(.caption).foregroundStyle(Neon.violet)
   }
 
   private struct Point: Identifiable {
@@ -198,7 +264,9 @@ struct UsageHistoryView: View {
     history.daily.flatMap { day -> [Point] in
       switch history.metric {
       case .cost:
-        return day.costByModel.map { Point(id: "\(day.date)-\($0.key)", date: shortDate(day.date), model: $0.key, value: $0.value) }
+        return day.costByModel.map {
+          Point(id: "\(day.date)-\($0.key)", date: shortDate(day.date), model: $0.key, value: $0.value)
+        }
       case .tokens:
         return [Point(id: day.date, date: shortDate(day.date), model: "Tokens", value: Double(day.totals.totalTokens))]
       }
@@ -206,67 +274,84 @@ struct UsageHistoryView: View {
   }
 
   private var chart: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text(history.metric == .cost ? "Costo equivalente por día y modelo" : "Tokens por día").font(.headline)
+    let models = Array(Set(points.map(\.model))).sorted()
+    return VStack(alignment: .leading, spacing: 10) {
+      Text(history.metric == .cost ? "COSTO EQUIVALENTE POR DÍA Y MODELO" : "TOKENS POR DÍA")
+        .font(.system(size: 11, weight: .heavy, design: .rounded)).kerning(1).foregroundStyle(Neon.cyan)
       Chart(points) { point in
         BarMark(x: .value("Día", point.date), y: .value(history.metric.rawValue, point.value))
           .foregroundStyle(by: .value("Modelo", point.model))
+          .cornerRadius(3)
       }
+      .chartForegroundStyleScale(domain: models, range: Array(Neon.series.prefix(max(models.count, 1))))
       .chartYAxis {
         AxisMarks { value in
-          AxisGridLine()
+          AxisGridLine().foregroundStyle(Neon.dim.opacity(0.25))
           AxisValueLabel {
             if let number = value.as(Double.self) {
               Text(history.metric == .cost ? UsageFormat.money(number) : UsageFormat.tokens(Int(number)))
+                .foregroundStyle(Neon.dim)
             }
           }
         }
       }
-      .frame(height: 220)
+      .chartXAxis {
+        AxisMarks { _ in
+          AxisValueLabel().foregroundStyle(Neon.dim)
+        }
+      }
+      .frame(height: 230)
       if history.daily.allSatisfy({ $0.totals.messages == 0 }) {
-        Text("Sin uso en este periodo.").font(.caption).foregroundStyle(.secondary)
+        Text("Sin uso en este periodo.").font(.caption).foregroundStyle(Neon.dim)
       }
     }
   }
 
   private var projectsTable: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text("Por proyecto").font(.headline)
-      Table(history.projects) {
-        TableColumn("Proyecto", value: \.project)
-        TableColumn("Costo") { Text(UsageFormat.money($0.totals.cost)).monospacedDigit() }
-        TableColumn("Tokens") { Text(UsageFormat.tokens($0.totals.totalTokens)).monospacedDigit() }
-        TableColumn("Sesiones") { Text("\($0.sessions)").monospacedDigit() }
-        TableColumn("Última actividad") { Text(relative($0.lastActivity)) }
+    VStack(alignment: .leading, spacing: 10) {
+      Text("POR PROYECTO").font(.system(size: 11, weight: .heavy, design: .rounded)).kerning(1).foregroundStyle(Neon.cyan)
+      let maxCost = history.projects.map(\.totals.cost).max() ?? 1
+      ForEach(history.projects.prefix(12)) { project in
+        HStack(spacing: 10) {
+          Text(project.project).font(.system(size: 12, weight: .semibold)).lineLimit(1).frame(width: 170, alignment: .leading)
+          NeonBar(fraction: maxCost > 0 ? project.totals.cost / maxCost : 0, color: Neon.magenta, height: 6)
+          Text(UsageFormat.money(project.totals.cost)).monospacedDigit().foregroundStyle(Neon.green)
+            .frame(width: 84, alignment: .trailing)
+          Text("\(project.sessions) \(project.sessions == 1 ? "sesión" : "sesiones")")
+            .font(.caption).foregroundStyle(Neon.dim).frame(width: 74, alignment: .trailing)
+        }
       }
-      .frame(height: min(CGFloat(history.projects.count) * 26 + 32, 260))
+      if history.projects.isEmpty {
+        Text("Sin proyectos en este periodo.").font(.caption).foregroundStyle(Neon.dim)
+      }
     }
   }
 
   private var windowsList: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text("Ventanas de 5 horas").font(.headline)
+    VStack(alignment: .leading, spacing: 8) {
+      Text("SESIONES DE 5 HORAS").font(.system(size: 11, weight: .heavy, design: .rounded)).kerning(1)
+        .foregroundStyle(Neon.cyan)
       ForEach(history.windows.prefix(20)) { window in
         HStack {
           Text(range(window)).monospacedDigit()
-          if window.limitHit != nil {
-            Label("límite", systemImage: "exclamationmark.octagon.fill").foregroundStyle(.red).font(.caption)
-          }
+          if window.anchored { NeonBadge(text: "reinicio exacto", color: Neon.cyan) }
+          if window.limitHit != nil { NeonBadge(text: "límite", color: Neon.pink) }
           Spacer()
-          Text(UsageFormat.tokens(window.totals.totalTokens)).foregroundStyle(.secondary).monospacedDigit()
-          Text(UsageFormat.money(window.totals.cost)).monospacedDigit().frame(width: 90, alignment: .trailing)
+          Text(UsageFormat.tokens(window.totals.totalTokens)).foregroundStyle(Neon.dim).monospacedDigit()
+          Text(UsageFormat.money(window.totals.cost)).monospacedDigit().foregroundStyle(Neon.green)
+            .frame(width: 90, alignment: .trailing)
         }
         .font(.callout)
       }
       if history.windows.isEmpty {
-        Text("Sin ventanas en este periodo.").font(.caption).foregroundStyle(.secondary)
+        Text("Sin ventanas en este periodo.").font(.caption).foregroundStyle(Neon.dim)
       }
     }
   }
 
   private var footer: some View {
     HStack {
-      Text("Los precios son editables en config.json (`pricing`).").font(.caption).foregroundStyle(.secondary)
+      Text("Los precios son editables en config.json (`pricing`).").font(.caption).foregroundStyle(Neon.dim)
       Button("Abrir configuración") {
         NSWorkspace.shared.open(
           CoreSettings.supportDirectory(home: FileManager.default.homeDirectoryForCurrentUser).appending(
@@ -284,18 +369,12 @@ struct UsageHistoryView: View {
   private func range(_ window: WindowSummary) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "es_MX")
-    formatter.dateFormat = "d MMM HH:mm"
-    let start = Date(timeIntervalSince1970: window.start / 1000)
-    let end = Date(timeIntervalSince1970: window.end / 1000)
+    formatter.dateFormat = "EEE d MMM HH:mm"
     let endFormatter = DateFormatter()
     endFormatter.dateFormat = "HH:mm"
+    let start = Date(timeIntervalSince1970: window.start / 1000)
+    let end = Date(timeIntervalSince1970: window.end / 1000)
     return "\(formatter.string(from: start)) → \(endFormatter.string(from: end))"
-  }
-
-  private func relative(_ ms: Double) -> String {
-    let formatter = RelativeDateTimeFormatter()
-    formatter.locale = Locale(identifier: "es_MX")
-    return formatter.localizedString(for: Date(timeIntervalSince1970: ms / 1000), relativeTo: Date())
   }
 }
 
