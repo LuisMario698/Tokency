@@ -1,4 +1,4 @@
-import type { HookEvent, Session } from "@tokency/shared";
+import type { HookEvent, Session, StatusSnapshot } from "@tokency/shared";
 
 import {
   applyHookEvent,
@@ -109,6 +109,29 @@ export class SessionRegistry {
       transcriptPath: details.transcriptPath,
       cwd: details.cwd ?? pending?.cwd ?? null,
     });
+  }
+
+  /**
+   * Métricas oficiales de la status line (D-017): costo de la sesión según Claude Code y uso de
+   * contexto. No cuentan como actividad, porque la status line también corre sin mensajes nuevos.
+   */
+  applyStatus(snapshot: StatusSnapshot): void {
+    const candidates = [...this.#sessions.values()].filter(
+      (s) => s.sessionId === snapshot.sessionId && s.state !== "ended",
+    );
+    const samePid = candidates.filter((s) => s.pid !== null && s.pid === snapshot.pid);
+    const metrics = {
+      costUsd: snapshot.costUsd,
+      contextUsedPercentage: snapshot.contextUsedPercentage,
+      contextInputTokens: snapshot.contextInputTokens,
+      sessionName: snapshot.sessionName,
+      modelName: snapshot.modelName,
+      updatedAt: snapshot.ts,
+    };
+    for (const session of samePid.length > 0 ? samePid : candidates) {
+      if (session.metrics !== null && session.metrics.updatedAt > snapshot.ts) continue;
+      this.#commit({ ...session, metrics, model: snapshot.modelId ?? session.model });
+    }
   }
 
   /** Anota la terminal del proceso, que el core averigua aparte (ver `service.ts`). */

@@ -148,14 +148,24 @@ export interface UsageWindow {
  * Ventanas de 5 horas (D-015): cada una empieza con el primer mensaje posterior al fin de la
  * anterior. Si un aviso de límite dice cuándo se reinicia, esa hora fija el final de su ventana.
  */
+export interface WindowAnchor {
+  start: number;
+  end: number;
+}
+
 export function windows(
   entries: readonly UsageEntry[],
   limits: readonly LimitEvent[],
   pricing: PricingTable,
+  /** Ventanas conocidas con certeza, por ejemplo por el reinicio oficial de la status line. */
+  knownWindows: readonly WindowAnchor[] = [],
 ): UsageWindow[] {
-  const anchors = limits
-    .filter((event) => event.kind === "session" && event.resetsAt !== null)
-    .map((event) => ({ start: (event.resetsAt ?? 0) - WINDOW_MS, end: event.resetsAt ?? 0 }));
+  const anchors = [
+    ...knownWindows,
+    ...limits
+      .filter((event) => event.kind === "session" && event.resetsAt !== null)
+      .map((event) => ({ start: (event.resetsAt ?? 0) - WINDOW_MS, end: event.resetsAt ?? 0 })),
+  ];
   const result: UsageWindow[] = [];
   let current: UsageWindow | undefined;
   for (const entry of entries) {
@@ -188,7 +198,8 @@ export function windows(
 
 export interface CalibrationSample {
   at: number;
-  source: "transcript" | "manual";
+  /** `plan`: costo de la ventana dividido entre el porcentaje oficial de la status line. */
+  source: "transcript" | "manual" | "plan";
   windowStart: number;
   cost: number;
   totalTokens: number;
@@ -208,8 +219,9 @@ export function calibrate(
   windowList: readonly UsageWindow[],
   manualHits: readonly number[],
   pricing: PricingTable,
+  planSamples: readonly CalibrationSample[] = [],
 ): Calibration {
-  const samples: CalibrationSample[] = [];
+  const samples: CalibrationSample[] = [...planSamples];
   for (const window of windowList) {
     if (window.limitHit === null) continue;
     const hitAt = window.limitHit.timestamp;

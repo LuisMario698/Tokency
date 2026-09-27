@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { HOOK_EVENTS, PROMPT_PREVIEW_LENGTH, type HookEvent } from "./hook-event.ts";
+import type { StatusSnapshot } from "./statusline.ts";
 import type { UsageSummary } from "./usage.ts";
 
 const shortText = z.string().max(200).nullable();
@@ -26,6 +27,40 @@ export const hookEventSchema = z.object({
   prompt: z.string().max(PROMPT_PREVIEW_LENGTH).nullable(),
   backgroundTasks: z.number().int().nonnegative().nullable(),
 }) satisfies z.ZodType<HookEvent>;
+
+const rateWindow = z.object({ usedPercentage: z.number(), resetsAt: z.number() }).nullable();
+const optionalNumber = z.number().nullable();
+
+export const statusSnapshotSchema = z.object({
+  ts: z.number().int().nonnegative(),
+  sessionId: z.string().min(1).max(200),
+  pid: z.number().int().positive().nullable(),
+  sessionName: shortText,
+  modelId: shortText,
+  modelName: shortText,
+  costUsd: optionalNumber,
+  durationMs: optionalNumber,
+  apiDurationMs: optionalNumber,
+  linesAdded: optionalNumber,
+  linesRemoved: optionalNumber,
+  contextUsedPercentage: optionalNumber,
+  contextWindowSize: optionalNumber,
+  contextInputTokens: optionalNumber,
+  fiveHour: rateWindow,
+  sevenDay: rateWindow,
+  spendLimit: rateWindow,
+}) satisfies z.ZodType<StatusSnapshot>;
+
+/** Métricas oficiales de una sesión, tomadas de su status line (D-017). */
+export const sessionMetricsSchema = z.object({
+  costUsd: optionalNumber,
+  contextUsedPercentage: optionalNumber,
+  contextInputTokens: optionalNumber,
+  sessionName: shortText,
+  modelName: shortText,
+  updatedAt: z.number(),
+});
+export type SessionMetrics = z.infer<typeof sessionMetricsSchema>;
 
 /**
  * - `working`: Claude está trabajando (azul).
@@ -81,6 +116,8 @@ export const sessionSchema = z.object({
   model: shortText,
   permissionMode: shortText,
   lastPrompt: z.string().max(PROMPT_PREVIEW_LENGTH).nullable(),
+  /** Solo en sesiones de terminal, donde corre la status line. */
+  metrics: sessionMetricsSchema.nullable().default(null),
   startedAt: z.number(),
   stateChangedAt: z.number(),
   lastActivityAt: z.number(),

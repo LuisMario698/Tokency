@@ -6,6 +6,7 @@ import {
   type JsonObject,
   type JsonValue,
   type OwnershipTest,
+  type StatusLineConfig,
 } from "./types.ts";
 
 export interface RemoveResult {
@@ -128,4 +129,44 @@ export function mergeOwnHooks(
   }
   if (Object.keys(hooks).length > 0 || result.hooks !== undefined) result.hooks = hooks;
   return result;
+}
+
+export interface StatusLineMerge {
+  settings: JsonObject;
+  /** `false` si el usuario ya tenía una status line propia y se conservó. */
+  applied: boolean;
+}
+
+/** Pone la status line propia salvo que el usuario tenga otra: esa nunca se reemplaza. */
+export function mergeOwnStatusLine(
+  settings: JsonObject,
+  statusLine: StatusLineConfig,
+  isOwn: OwnershipTest,
+): StatusLineMerge {
+  const current = settings.statusLine;
+  if (current !== undefined && !(isJsonObject(current) && isOwn(current))) {
+    return { settings, applied: false };
+  }
+  const entry: JsonObject = { type: statusLine.type, command: statusLine.command };
+  if (statusLine.padding !== undefined) entry.padding = statusLine.padding;
+  if (statusLine.refreshInterval !== undefined) entry.refreshInterval = statusLine.refreshInterval;
+  if (!isOwn(entry)) {
+    throw new Error(
+      "La status line no pasa la prueba de pertenencia; después no se podría quitar.",
+    );
+  }
+  return { settings: { ...structuredClone(settings), statusLine: entry }, applied: true };
+}
+
+export function removeOwnStatusLine(settings: JsonObject, isOwn: OwnershipTest): RemoveResult {
+  const current = settings.statusLine;
+  if (!(isJsonObject(current) && isOwn(current))) return { settings, removed: 0 };
+  const result = structuredClone(settings);
+  delete result.statusLine;
+  return { settings: result, removed: 1 };
+}
+
+/** Hooks o status line propios presentes. */
+export function hasOwnConfig(settings: JsonObject, isOwn: OwnershipTest): boolean {
+  return hasOwnHooks(settings, isOwn) || removeOwnStatusLine(settings, isOwn).removed > 0;
 }

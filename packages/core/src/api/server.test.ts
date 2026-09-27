@@ -172,6 +172,50 @@ describe("rutas", () => {
   });
 });
 
+describe("POST /v1/statusline", () => {
+  const body = {
+    ts: 5,
+    sessionId: "s1",
+    pid: 10,
+    sessionName: null,
+    modelId: "claude-opus-5-5",
+    modelName: "Opus 5.5",
+    costUsd: 2.5,
+    durationMs: null,
+    apiDurationMs: null,
+    linesAdded: null,
+    linesRemoved: null,
+    contextUsedPercentage: 30,
+    contextWindowSize: 1_000_000,
+    contextInputTokens: 300_000,
+    fiveHour: { usedPercentage: 40, resetsAt: 9_999_999_999_999 },
+    sevenDay: null,
+    spendLimit: null,
+  };
+
+  it("anota las métricas de la sesión y rechaza datos inválidos", async () => {
+    registry.applyHook(event());
+
+    const ok = await app.request("/v1/statusline", {
+      method: "POST",
+      headers: headers({ "content-type": "application/json" }),
+      body: JSON.stringify(body),
+    });
+    const bad = await app.request("/v1/statusline", {
+      method: "POST",
+      headers: headers({ "content-type": "application/json" }),
+      body: JSON.stringify({ ...body, sessionId: "" }),
+    });
+
+    expect(ok.status).toBe(202);
+    expect(bad.status).toBe(400);
+    expect(registry.get("s1:10")?.metrics).toMatchObject({
+      costUsd: 2.5,
+      contextUsedPercentage: 30,
+    });
+  });
+});
+
 describe("rutas de uso", () => {
   it("GET /v1/usage/summary devuelve el resumen", async () => {
     const response = await app.request("/v1/usage/summary", { headers: headers() });

@@ -6,6 +6,7 @@ import { tokencyPaths } from "@tokency/core";
 import {
   OFFICIAL_USAGE_URL,
   type DailyUsage,
+  type PlanLimit,
   type ProjectUsage,
   type TokenTotals,
   type UsageSummary,
@@ -47,9 +48,31 @@ function totalsLine(totals: TokenTotals): string {
   return `${money(totals.cost)} · ${compactTokens(totals.totalTokens)} tokens · ${String(totals.messages)} mensajes`;
 }
 
+function planLines(label: string, limit: PlanLimit, now: number, timeZone: string): string[] {
+  const lines = [
+    `${label} (oficial): ${bar(limit.usedPercentage / 100)} ${String(Math.round(limit.usedPercentage))} % · se reinicia ${clock(limit.resetsAt, timeZone)} (en ${elapsed(limit.resetsAt - now)})`,
+  ];
+  if (limit.estimated) {
+    lines.push(
+      `  ≈ ${String(Math.round(limit.estimatedNow))} % ahora, proyectado con el consumo desde el último dato oficial (hace ${elapsed(now - limit.observedAt)})`,
+    );
+  } else {
+    lines.push(`  dato oficial de hace ${elapsed(now - limit.observedAt)}`);
+  }
+  return lines;
+}
+
 export function summaryLines(summary: UsageSummary): string[] {
   const lines: string[] = [];
-  const { window, calibration, timeZone } = summary;
+  const { window, calibration, timeZone, plan, generatedAt } = summary;
+  if (plan?.fiveHour)
+    lines.push(...planLines("Sesión de 5 horas", plan.fiveHour, generatedAt, timeZone));
+  if (plan?.sevenDay) lines.push(...planLines("Semana", plan.sevenDay, generatedAt, timeZone));
+  if (plan === null) {
+    lines.push(
+      "Uso oficial del plan: todavía no llega (lo manda la status line de Tokency en la terminal).",
+    );
+  }
   if (window === null) {
     lines.push("Ventana de 5 horas: ninguna abierta (empieza con tu próximo mensaje).");
   } else {

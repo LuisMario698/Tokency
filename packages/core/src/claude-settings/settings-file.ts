@@ -14,7 +14,14 @@ import os from "node:os";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
-import { hasOwnHooks, isJsonObject, mergeOwnHooks, removeOwnHooks } from "./hooks.ts";
+import {
+  hasOwnConfig,
+  isJsonObject,
+  mergeOwnHooks,
+  mergeOwnStatusLine,
+  removeOwnHooks,
+  removeOwnStatusLine,
+} from "./hooks.ts";
 import {
   ConcurrentModificationError,
   InvalidSettingsError,
@@ -22,6 +29,7 @@ import {
   type JsonObject,
   type JsonValue,
   type OwnershipTest,
+  type StatusLineConfig,
 } from "./types.ts";
 
 export interface ClaudeSettingsPaths {
@@ -39,10 +47,16 @@ export interface HookFileOptions {
 
 export interface InstallOptions extends HookFileOptions {
   hooks: HooksConfig;
+  /** Status line propia; si el usuario ya tiene otra, se conserva la suya. */
+  statusLine?: StatusLineConfig;
 }
 
-export type InstallResult =
-  { status: "installed"; backupPath: string } | { status: "unchanged"; backupPath: null };
+export type InstallResult = (
+  { status: "installed"; backupPath: string } | { status: "unchanged"; backupPath: null }
+) & {
+  /** `true` si el usuario ya tenía una status line propia y se conservó. */
+  userStatusLineKept: boolean;
+};
 
 export type UninstallResult =
   /** El archivo volvió a ser, byte por byte, el de antes de instalar. */
@@ -216,22 +230,28 @@ async function findOriginalBackup(
     } catch {
       continue;
     }
-    if (!hasOwnHooks(settings, isOwn)) return { kind: "file", raw, settings };
+    if (!hasOwnConfig(settings, isOwn)) return { kind: "file", raw, settings };
   }
   return undefined;
 }
 
 /** Respalda `settings.json` y le agrega los hooks propios sin tocar los del usuario. */
 export async function installHooks(options: InstallOptions): Promise<InstallResult> {
-  const { paths, owner, isOwn, hooks, now = () => new Date() } = options;
+  const { paths, owner, isOwn, hooks, statusLine, now = () => new Date() } = options;
   const snapshot = await readSnapshot(paths.settingsFile);
-  const next = mergeOwnHooks(snapshot.settings, hooks, isOwn);
+  let next = mergeOwnHooks(snapshot.settings, hooks, isOwn);
+  let userStatusLineKept = false;
+  if (statusLine !== undefined) {
+    const merged = mergeOwnStatusLine(next, statusLine, isOwn);
+    next = merged.settings;
+    userStatusLineKept = !merged.applied;
+  }
   if (snapshot.raw !== null && isDeepStrictEqual(next, snapshot.settings)) {
-    return { status: "unchanged", backupPath: null };
+    return { status: "unchanged", backupPath: null, userStatusLineKept };
   }
   const backupPath = await writeBackup(paths.backupDir, snapshot, owner, "pre-install", now());
   await writeAtomic(snapshot, serialize(next, snapshot.raw));
-  return { status: "installed", backupPath };
+  return { status: "installed", backupPath, userStatusLineKept };
 }
 
 /**
@@ -242,8 +262,14 @@ export async function uninstallHooks(options: HookFileOptions): Promise<Uninstal
   const { paths, owner, isOwn, now = () => new Date() } = options;
   const snapshot = await readSnapshot(paths.settingsFile);
   if (snapshot.raw === null) return { status: "not-installed", backupPath: null };
-  const { settings: next, removed } = removeOwnHooks(snapshot.settings, isOwn);
-  if (removed === 0) return { status: "not-installed", backupPath: null };
+  const withoutHooks = removeOwnHooks(snapshot.settings, isOwn);
+  const { settings: next, removed: removedStatusLine } = removeOwnStatusLine(
+    withoutHooks.settings,
+    isOwn,
+  );
+  if (withoutHooks.removed + removedStatusLine === 0) {
+    return { status: "not-installed", backupPath: null };
+  }
 
   const backupPath = await writeBackup(paths.backupDir, snapshot, owner, "pre-uninstall", now());
   const original = await findOriginalBackup(paths.backupDir, owner, isOwn);

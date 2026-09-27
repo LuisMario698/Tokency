@@ -16,6 +16,7 @@ Uso: tokency <comando>
   logs [-n N] [-f]      Muestra el log del core
   serve                 Arranca el core (lo usa launchd)
   hook <evento>         Reenvía un evento de Claude Code al core (lo usan los hooks)
+  statusline            Status line de Claude Code con el uso oficial del plan
 `;
 
 async function dispatch(command: string | undefined, args: string[]): Promise<number> {
@@ -23,6 +24,11 @@ async function dispatch(command: string | undefined, args: string[]): Promise<nu
     case "hook": {
       const { hookCommand } = await import("./commands/hook.ts");
       await hookCommand(args);
+      return 0;
+    }
+    case "statusline": {
+      const { statuslineCommand } = await import("./commands/statusline.ts");
+      await statuslineCommand();
       return 0;
     }
     case "serve":

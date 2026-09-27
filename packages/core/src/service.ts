@@ -14,6 +14,7 @@ import { isProcessAlive } from "./watchers/processes.ts";
 import { watchTranscripts } from "./watchers/transcripts.ts";
 import { processTty } from "./watchers/tty.ts";
 import { UsageIngestor } from "./usage/ingest.ts";
+import { PlanRepository } from "./usage/plan.ts";
 import { mergePricing } from "./usage/pricing.ts";
 import { UsageRepository } from "./usage/repository.ts";
 import { UsageService } from "./usage/service.ts";
@@ -89,6 +90,7 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
   });
 
   const usageRepository = new UsageRepository(db);
+  const plan = new PlanRepository(db);
   const usage = new UsageService({
     repository: usageRepository,
     ingestor: new UsageIngestor({
@@ -96,6 +98,7 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
       projectsDir: paths.claudeProjectsDir,
       logger,
     }),
+    plan,
     pricing: mergePricing(config.pricing),
     timeZone: options.timeZone,
   });
@@ -107,6 +110,7 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
     registry,
     recorder: repository,
     usage,
+    plan,
     logger,
     version,
     startedAt,

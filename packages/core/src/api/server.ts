@@ -3,7 +3,12 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { serve, type ServerType } from "@hono/node-server";
-import { hookEventSchema, type HookEvent, type LiveEvent } from "@tokency/shared";
+import {
+  hookEventSchema,
+  statusSnapshotSchema,
+  type HookEvent,
+  type LiveEvent,
+} from "@tokency/shared";
 import { Hono, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
@@ -11,6 +16,7 @@ import { streamSSE } from "hono/streaming";
 
 import type { Logger } from "../logger.ts";
 import type { SessionChange, SessionRegistry } from "../sessions/registry.ts";
+import type { PlanRepository } from "../usage/plan.ts";
 import type { UsageService } from "../usage/service.ts";
 import { registerUsageRoutes } from "./usage-routes.ts";
 import { instanceId } from "../sessions/state-machine.ts";
@@ -25,6 +31,7 @@ export interface ApiOptions {
   registry: SessionRegistry;
   recorder?: HookEventRecorder;
   usage?: UsageService;
+  plan?: PlanRepository;
   /** Espera mínima entre dos `usage.updated` por la misma conexión. */
   usageThrottleMs?: number;
   logger: Logger;
@@ -80,6 +87,7 @@ export function createApi(options: ApiOptions): Hono {
     logger,
     recorder,
     usage,
+    plan,
     now = Date.now,
     heartbeatMs = 15_000,
     usageThrottleMs = 3_000,
@@ -123,6 +131,27 @@ export function createApi(options: ApiOptions): Hono {
       logger.warn("No se pudo registrar el evento", { error });
     }
     logger.debug("Evento de hook", { event: event.event, sessionId: event.sessionId });
+    return c.json({ ok: true }, 202);
+  });
+
+  // Datos de la status line de Claude Code: la fuente oficial del uso del plan (D-017).
+  app.post("/v1/statusline", bodyLimit({ maxSize: 16 * 1024 }), async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "El cuerpo no es JSON válido." }, 400);
+    }
+    const parsed = statusSnapshotSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: "Datos de status line inválidos.", issues: parsed.error.issues }, 400);
+    }
+    const snapshot = parsed.data;
+    registry.applyStatus(snapshot);
+    plan?.record(snapshot);
+    if (snapshot.fiveHour !== null || snapshot.sevenDay !== null || snapshot.costUsd !== null) {
+      usage?.notifyChanged();
+    }
     return c.json({ ok: true }, 202);
   });
 

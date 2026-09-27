@@ -2,3 +2,4 @@
 export * from "./hook-event.ts";
 export * from "./schemas.ts";
 export * from "./usage.ts";
+export * from "./statusline.ts";

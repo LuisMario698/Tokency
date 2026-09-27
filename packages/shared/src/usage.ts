@@ -37,9 +37,29 @@ export interface LimitInfo {
   source: "transcript" | "manual";
 }
 
+/** Porcentaje oficial de un límite del plan y su proyección hasta ahora (D-017). */
+export interface PlanLimit {
+  /** Último porcentaje oficial que reportó Claude Code (0–100). */
+  usedPercentage: number;
+  resetsAt: number;
+  /** Cuándo se recibió ese dato oficial. */
+  observedAt: number;
+  /** Porcentaje proyectado a este momento con el consumo local posterior al dato oficial. */
+  estimatedNow: number;
+  /** `true` si hubo consumo después del dato oficial y `estimatedNow` es una proyección. */
+  estimated: boolean;
+}
+
+export interface PlanUsage {
+  fiveHour: PlanLimit | null;
+  sevenDay: PlanLimit | null;
+}
+
 export interface UsageSummary {
   generatedAt: number;
   timeZone: string;
+  /** Uso oficial del plan según la status line de Claude Code; `null` si nunca llegó. */
+  plan: PlanUsage | null;
   /** Ventana de 5 horas vigente; `null` si no hay una abierta. */
   window: ActiveWindow | null;
   today: TokenTotals;

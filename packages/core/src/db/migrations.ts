@@ -76,4 +76,21 @@ export const MIGRATIONS: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 3,
+    sql: `
+      -- Uso oficial del plan que Claude Code entrega a la status line (D-017). Una fila por
+      -- cambio de valor; si el valor se repite solo se actualiza observed_at.
+      CREATE TABLE plan_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL,
+        first_observed_at INTEGER NOT NULL,
+        observed_at INTEGER NOT NULL,
+        used_percentage REAL NOT NULL,
+        resets_at INTEGER NOT NULL,
+        session_id TEXT
+      );
+      CREATE INDEX plan_snapshots_kind_observed_at ON plan_snapshots (kind, observed_at);
+    `,
+  },
 ];

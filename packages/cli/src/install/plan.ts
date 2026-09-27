@@ -7,6 +7,7 @@ import {
   LAUNCH_AGENT_LABEL,
   type HooksConfig,
   type OwnershipTest,
+  type StatusLineConfig,
   type TokencyPaths,
 } from "@tokency/core";
 import { HOOK_EVENTS } from "@tokency/shared";
@@ -56,6 +57,15 @@ export function tokencyHooks(nodePath: string, entry: string): HooksConfig {
       return [event, [{ hooks: [hook] }]];
     }),
   );
+}
+
+/** Status line de Tokency: la única fuente oficial del uso del plan (D-017). */
+export function tokencyStatusLine(nodePath: string, entry: string): StatusLineConfig {
+  return {
+    type: "command",
+    command: `${shellQuote(nodePath)} ${shellQuote(entry)} statusline`,
+    padding: 0,
+  };
 }
 
 export const WRAPPER_MARKER = "# Generado por `tokency install`.";

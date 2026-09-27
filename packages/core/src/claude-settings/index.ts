@@ -1,6 +1,9 @@
 export {
   commandContains,
+  hasOwnConfig,
   hasOwnHooks,
+  mergeOwnStatusLine,
+  removeOwnStatusLine,
   isJsonObject,
   mergeOwnHooks,
   removeOwnHooks,
@@ -24,4 +27,5 @@ export {
   type JsonObject,
   type JsonValue,
   type OwnershipTest,
+  type StatusLineConfig,
 } from "./types.ts";

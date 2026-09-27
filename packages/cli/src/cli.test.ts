@@ -5,12 +5,14 @@ import { describe, expect, it, vi } from "vitest";
 import { installedTokencyHooks, nodeFromCommand } from "./commands/doctor.ts";
 import { buildHookEvent, claudePid, runHook, type HookDeps } from "./commands/hook.ts";
 import { elapsed, formatSession } from "./commands/status.ts";
+import { levelColor, meter, NEON, renderStatusLine } from "./commands/statusline.ts";
 import { bar, compactTokens, money, summaryLines } from "./commands/usage.ts";
 import {
   isTokencyHook,
   nodeVersionOk,
   stableNodePath,
   tokencyHooks,
+  tokencyStatusLine,
   wrapperScript,
 } from "./install/plan.ts";
 
@@ -230,6 +232,7 @@ describe("tokency usage", () => {
     const lines = summaryLines({
       generatedAt: 0,
       timeZone: "UTC",
+      plan: null,
       window: {
         start: Date.UTC(2026, 8, 26, 10),
         end: Date.UTC(2026, 8, 26, 15),
@@ -258,10 +261,111 @@ describe("tokency usage", () => {
       firstEntryAt: 0,
     });
 
-    expect(lines[0]).toContain("se reinicia en 1 h 30 min");
-    expect(lines[1]).toContain("50 % del tope estimado ($50.00, 2 muestras)");
-    expect(lines[2]).toBe("  ritmo $12.50/h · proyección al cierre $43.75");
+    expect(lines[0]).toContain("Uso oficial del plan: todavía no llega");
+    expect(lines[1]).toContain("se reinicia en 1 h 30 min");
+    expect(lines[2]).toContain("50 % del tope estimado ($50.00, 2 muestras)");
+    expect(lines[3]).toBe("  ritmo $12.50/h · proyección al cierre $43.75");
     expect(lines.some((l) => l.startsWith("Último límite alcanzado"))).toBe(true);
     expect(lines.at(-1)).toContain("modelo-x");
+  });
+});
+
+// Quita los códigos de color para comparar el texto.
+// eslint-disable-next-line no-control-regex
+const plain = (text: string) => text.replace(/\x1b\[[0-9;]*m/g, "");
+
+describe("tokency statusline", () => {
+  const snapshot = {
+    ts: 0,
+    sessionId: "s",
+    pid: null,
+    sessionName: null,
+    modelId: "claude-opus-5-5",
+    modelName: "Opus 5.5",
+    costUsd: 3.214,
+    durationMs: null,
+    apiDurationMs: null,
+    linesAdded: null,
+    linesRemoved: null,
+    contextUsedPercentage: 34.4,
+    contextWindowSize: 1_000_000,
+    contextInputTokens: 344_000,
+    fiveHour: { usedPercentage: 47.4, resetsAt: Date.UTC(2026, 8, 27, 1, 10) },
+    sevenDay: { usedPercentage: 18, resetsAt: Date.UTC(2026, 9, 2, 16) },
+    spendLimit: null,
+  };
+
+  it("muestra el uso oficial del plan, el costo y el contexto de la sesión", () => {
+    const line = plain(renderStatusLine(snapshot, { columns: 140, timeZone: "UTC" }));
+
+    expect(line).toMatch(
+      /^◆ Tokency │ 5h ▰▰▰▰▱▱▱▱ 47% ⟳ 01:10 │ 7d 18% ⟳ .+ │ sesión \$3\.21 │ ctx 34% │ Opus 5\.5$/,
+    );
+  });
+
+  it("en terminales angostas deja solo lo esencial", () => {
+    const line = plain(renderStatusLine(snapshot, { columns: 60, timeZone: "UTC" }));
+
+    expect(line).toBe("◆ Tokency │ 5h 47% ⟳ 01:10 │ 7d 18% │ sesión $3.21");
+  });
+
+  it("usa colores neón según qué tan cerca está el límite", () => {
+    expect(levelColor(10)).toBe(NEON.cyan);
+    expect(levelColor(75)).toBe(NEON.amber);
+    expect(levelColor(95)).toBe(NEON.pink);
+    expect(meter(100, 4)).toBe("▰▰▰▰");
+    expect(renderStatusLine(snapshot)).toContain("\x1b[1;38;2;255;43;214m");
+  });
+
+  it("la status line de Tokency se reconoce para quitarla al desinstalar", () => {
+    const statusLine = tokencyStatusLine(NODE, ENTRY);
+
+    expect(statusLine).toEqual({
+      type: "command",
+      command: `'${NODE}' '${ENTRY}' statusline`,
+      padding: 0,
+    });
+    expect(isTokencyHook({ ...statusLine })).toBe(true);
+  });
+
+  it("el resumen pone primero el porcentaje oficial y su proyección", () => {
+    const totals = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      totalTokens: 0,
+      cost: 0,
+      unpricedTokens: 0,
+      messages: 0,
+    };
+    const now = Date.UTC(2026, 8, 26, 22);
+    const lines = summaryLines({
+      generatedAt: now,
+      timeZone: "UTC",
+      plan: {
+        fiveHour: {
+          usedPercentage: 40,
+          resetsAt: now + 90 * 60_000,
+          observedAt: now - 12 * 60_000,
+          estimatedNow: 46,
+          estimated: true,
+        },
+        sevenDay: null,
+      },
+      window: null,
+      today: totals,
+      last7Days: totals,
+      calibration: { estimatedCap: null, samples: 0, lastLimit: null },
+      sessions: {},
+      unpricedModels: [],
+      firstEntryAt: null,
+    });
+
+    expect(lines[0]).toContain("Sesión de 5 horas (oficial):");
+    expect(lines[0]).toContain("40 % · se reinicia");
+    expect(lines[1]).toBe(
+      "  ≈ 46 % ahora, proyectado con el consumo desde el último dato oficial (hace 12 min)",
+    );
   });
 });

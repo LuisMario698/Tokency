@@ -116,6 +116,7 @@ function session(id: string, state: Session["state"]): Session {
     model: null,
     permissionMode: null,
     lastPrompt: "hola",
+    metrics: null,
     startedAt: 1,
     stateChangedAt: 1,
     lastActivityAt: 1,

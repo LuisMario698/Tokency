@@ -7,7 +7,8 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./hook-event": "./src/hook-event.ts"
+    "./hook-event": "./src/hook-event.ts",
+    "./statusline": "./src/statusline.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

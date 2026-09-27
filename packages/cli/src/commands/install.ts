@@ -29,6 +29,7 @@ import {
   nodeVersionOk,
   stableNodePath,
   tokencyHooks,
+  tokencyStatusLine,
   WRAPPER_MARKER,
   wrapperScript,
 } from "../install/plan.ts";
@@ -120,6 +121,7 @@ export async function installCommand(args: readonly string[]): Promise<number> {
   say.info(`bundle: ${bundleDir} → ${paths.appDir}`);
   say.info(`LaunchAgent: ${paths.launchAgentPlist}`);
   say.info(`hooks en ${settings.settingsFile}: ${Object.keys(hooks).join(", ")}`);
+  say.info("status line: la de Tokency, con el uso oficial del plan (si no tienes otra)");
   say.info(`comando: ${paths.cliWrapper}`);
   if (dryRun) return 0;
 
@@ -154,6 +156,7 @@ export async function installCommand(args: readonly string[]): Promise<number> {
     }
 
     const result = await installHooks({
+      statusLine: tokencyStatusLine(nodePath, entry),
       paths: settings,
       owner: HOOK_OWNER,
       isOwn: isTokencyHook,
@@ -164,6 +167,14 @@ export async function installCommand(args: readonly string[]): Promise<number> {
       say.info(`Respaldo: ${result.backupPath}`);
     } else {
       say.ok("Los hooks ya estaban instalados");
+    }
+    if (result.userStatusLineKept) {
+      say.warn("Ya tienes una status line propia y se conservó.");
+      say.info(
+        "El uso oficial del plan solo llega con la de Tokency; mientras tanto se estima (D-017).",
+      );
+    } else {
+      say.ok("Status line de Tokency activa: el uso oficial del plan llega en cada respuesta");
     }
 
     await writeWrapper(paths, nodePath);

@@ -104,7 +104,7 @@ describe("installHooks + uninstallHooks", () => {
 
     const again = await installHooks({ paths, owner, isOwn, hooks, now });
 
-    expect(again).toEqual({ status: "unchanged", backupPath: null });
+    expect(again).toEqual({ status: "unchanged", backupPath: null, userStatusLineKept: false });
     expect(await readFile(paths.settingsFile, "utf8")).toBe(after);
     expect(await readdir(paths.backupDir)).toHaveLength(1);
   });
@@ -244,6 +244,47 @@ describe("installHooks + uninstallHooks", () => {
 
     expect(result.status).toBe("restored");
     expect(await readdir(paths.backupDir)).toHaveLength(4);
+  });
+});
+
+describe("status line", () => {
+  const statusLine = {
+    type: "command" as const,
+    command: "/opt/tokency/hook statusline",
+    padding: 0,
+  };
+
+  it("la instala junto con los hooks y al desinstalar restaura el archivo byte por byte", async () => {
+    await writeFile(paths.settingsFile, original);
+
+    const installed = await installHooks({ paths, owner, isOwn, hooks, statusLine, now });
+
+    expect(installed).toMatchObject({ status: "installed", userStatusLineKept: false });
+    expect((await readJson(paths.settingsFile)).statusLine).toEqual(statusLine);
+
+    expect((await uninstallHooks({ paths, owner, isOwn, now })).status).toBe("restored");
+    expect(await readFile(paths.settingsFile, "utf8")).toBe(original);
+  });
+
+  it("nunca reemplaza una status line propia del usuario", async () => {
+    const mine = { type: "command", command: "~/.claude/mi-statusline.sh" };
+    await writeFile(paths.settingsFile, JSON.stringify({ statusLine: mine }));
+
+    const installed = await installHooks({ paths, owner, isOwn, hooks, statusLine, now });
+
+    expect(installed.userStatusLineKept).toBe(true);
+    expect((await readJson(paths.settingsFile)).statusLine).toEqual(mine);
+    await uninstallHooks({ paths, owner, isOwn, now });
+    expect((await readJson(paths.settingsFile)).statusLine).toEqual(mine);
+  });
+
+  it("agregarla a una instalación que ya tenía hooks sigue restaurando el original", async () => {
+    await writeFile(paths.settingsFile, original);
+    await installHooks({ paths, owner, isOwn, hooks, now });
+    await installHooks({ paths, owner, isOwn, hooks, statusLine, now });
+
+    expect((await uninstallHooks({ paths, owner, isOwn, now })).status).toBe("restored");
+    expect(await readFile(paths.settingsFile, "utf8")).toBe(original);
   });
 });
 

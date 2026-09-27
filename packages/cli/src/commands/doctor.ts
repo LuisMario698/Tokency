@@ -15,10 +15,11 @@ import {
   type JsonValue,
   type TokencyPaths,
 } from "@tokency/core";
-import { HOOK_EVENTS } from "@tokency/shared";
+import { HOOK_EVENTS, type UsageSummary } from "@tokency/shared";
 
 import { coreClient } from "../client.ts";
 import { ENTRY_FILE, HOOK_MARKER, nodeVersionOk } from "../install/plan.ts";
+import { elapsed } from "./status.ts";
 import { errorMessage, say } from "../output.ts";
 
 export interface Check {
@@ -132,6 +133,46 @@ export async function runChecks(paths: TokencyPaths): Promise<Check[]> {
           fix: reinstall,
         },
   );
+
+  const statusLine = isJsonObject(settings) ? settings.statusLine : undefined;
+  const ownStatusLine =
+    isJsonObject(statusLine) &&
+    typeof statusLine.command === "string" &&
+    statusLine.command.includes(HOOK_MARKER);
+  checks.push(
+    ownStatusLine
+      ? { name: "Status line", status: "ok", detail: "la de Tokency (uso oficial del plan)" }
+      : statusLine === undefined
+        ? { name: "Status line", status: "fail", detail: "No está instalada", fix: reinstall }
+        : {
+            name: "Status line",
+            status: "warn",
+            detail: "Tienes una propia; el uso del plan se estima en lugar de leerse",
+            fix: "Quita tu statusLine de ~/.claude/settings.json y reinstala si quieres el dato oficial.",
+          },
+  );
+
+  try {
+    const client = await coreClient(paths);
+    const summary = await client.get<UsageSummary>("/v1/usage/summary");
+    const five = summary.plan?.fiveHour;
+    checks.push(
+      five
+        ? {
+            name: "Uso oficial del plan",
+            status: "ok",
+            detail: `sesión ${String(Math.round(five.usedPercentage))} %, dato de hace ${elapsed(summary.generatedAt - five.observedAt)}`,
+          }
+        : {
+            name: "Uso oficial del plan",
+            status: "warn",
+            detail: "Todavía no llega ningún dato oficial",
+            fix: "Abre una sesión de Claude Code en la terminal y manda un mensaje: la status line lo envía.",
+          },
+    );
+  } catch {
+    // Si el core no responde ya se reportó arriba.
+  }
 
   const hookNode = [...hooks.values()].map(nodeFromCommand).find((node) => node !== null);
   if (hookNode !== undefined) {

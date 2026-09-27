@@ -20,6 +20,14 @@ export interface HookMatcherGroup {
   hooks: readonly CommandHook[];
 }
 
+/** Status line de tipo comando (https://code.claude.com/docs/en/statusline). */
+export interface StatusLineConfig {
+  type: "command";
+  command: string;
+  padding?: number;
+  refreshInterval?: number;
+}
+
 /** Hooks por nombre de evento (`SessionStart`, `Stop`, …). */
 export type HooksConfig = Readonly<Record<string, readonly HookMatcherGroup[]>>;
 
