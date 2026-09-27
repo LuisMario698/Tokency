@@ -97,6 +97,7 @@ function deps(
       CLAUDE_PID: "321",
       CLAUDE_CODE_ENTRYPOINT: "cli",
       __CFBundleIdentifier: "com.apple.Terminal",
+      CLAUDE_PROJECT_DIR: "/Users/x/Developer/Tokency",
     },
     ppid: 99,
     now: () => 1_234,
@@ -119,6 +120,7 @@ describe("tokency hook", () => {
       ts: 1_234,
       sessionId: "s1",
       pid: 321,
+      projectDir: "/Users/x/Developer/Tokency",
       origin: { entrypoint: "cli", bundleId: "com.apple.Terminal", termProgram: null },
     });
     expect(body).not.toContain("last_assistant_message");

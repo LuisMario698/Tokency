@@ -30,6 +30,7 @@ function event(extra: Partial<HookEvent> = {}): HookEvent {
     pid: 10,
     origin: { entrypoint: "cli", bundleId: "com.apple.Terminal", termProgram: null },
     cwd: "/repo",
+    projectDir: null,
     transcriptPath: null,
     permissionMode: null,
     model: null,

@@ -51,6 +51,8 @@ cat >"$APP/Contents/Info.plist" <<EOF
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Proyecto personal de Luis Mario.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Tokency controla la terminal solo para mostrar la pestaña de la sesión en la que hiciste clic.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

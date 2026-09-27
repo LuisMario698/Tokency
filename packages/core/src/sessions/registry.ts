@@ -111,6 +111,12 @@ export class SessionRegistry {
     });
   }
 
+  /** Anota la terminal del proceso, que el core averigua aparte (ver `service.ts`). */
+  setTty(id: string, tty: string): void {
+    const session = this.#sessions.get(id);
+    if (session !== undefined && session.tty !== tty) this.#commit({ ...session, tty });
+  }
+
   processExited(id: string): void {
     const session = this.#sessions.get(id);
     if (session !== undefined) this.#commit(applyProcessExit(session, this.#now()));

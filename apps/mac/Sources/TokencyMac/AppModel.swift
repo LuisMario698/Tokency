@@ -39,7 +39,7 @@ final class AppModel: ObservableObject {
   }
 
   func start() {
-    bands.onActivate = { session in SystemActions.activateApp(bundleId: session.origin.bundleId) }
+    bands.onActivate = { session in SystemActions.focus(session) }
     LoginItem.registerOnFirstLaunch()
     refreshLoginItem()
     loop = Task { [weak self] in await self?.run() }
@@ -92,7 +92,7 @@ final class AppModel: ObservableObject {
   }
 
   func activate(_ session: Session) {
-    SystemActions.activateApp(bundleId: session.origin.bundleId)
+    SystemActions.focus(session)
   }
 
   func restartCore() {

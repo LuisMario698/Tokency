@@ -15,6 +15,38 @@ enum SystemActions {
     app.activate()
   }
 
+  /// Lleva al usuario a la sesión exacta: su pestaña de terminal, o la ventana y pestaña del IDE.
+  static func focus(_ session: Session) {
+    let plan = SessionFocus.plan(for: session) { bundleId in
+      NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId)
+        .flatMap { Bundle(url: $0)?.infoDictionary }
+        .flatMap { SessionFocus.primaryURLScheme(infoDictionary: $0) }
+    }
+    switch plan {
+    case .terminalTab(let bundleId, let script):
+      // La primera vez macOS pide permiso para controlar la terminal (NSAppleEventsUsageDescription).
+      var error: NSDictionary?
+      let result = NSAppleScript(source: script)?.executeAndReturnError(&error)
+      if error != nil || result?.booleanValue != true { activateApp(bundleId: bundleId) }
+    case .ideWindow(let bundleId, let folder, let sessionURL):
+      guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else { return }
+      let configuration = NSWorkspace.OpenConfiguration()
+      configuration.activates = true
+      // Abrir la carpeta con el IDE enfoca la ventana que ya la tiene abierta.
+      NSWorkspace.shared.open([URL(filePath: folder)], withApplicationAt: appURL, configuration: configuration) { _, _ in
+        guard let sessionURL else { return }
+        // La URI actúa sobre la ventana enfocada: se espera a que el IDE cambie de ventana.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+          NSWorkspace.shared.open(sessionURL)
+        }
+      }
+    case .activate(let bundleId):
+      activateApp(bundleId: bundleId)
+    case .none:
+      break
+    }
+  }
+
   /// Nombre visible de una app a partir de su bundle id, por ejemplo "Terminal".
   static func appName(bundleId: String?) -> String? {
     guard let bundleId else { return nil }

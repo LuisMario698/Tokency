@@ -21,6 +21,7 @@ function hook(event: HookEventName, extra: Partial<HookEvent> = {}): HookEvent {
     pid: 100,
     origin: { entrypoint: "cli", bundleId: "com.apple.Terminal", termProgram: "Apple_Terminal" },
     cwd: "/Users/x/Developer/Tokency",
+    projectDir: "/Users/x/Developer/Tokency",
     transcriptPath: "/Users/x/.claude/projects/-Users-x-Developer-Tokency/s1.jsonl",
     permissionMode: "default",
     model: null,

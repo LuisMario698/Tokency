@@ -36,6 +36,8 @@ export interface HookEvent {
   pid: number | null;
   origin: HookOrigin;
   cwd: string | null;
+  /** `CLAUDE_PROJECT_DIR`: la carpeta abierta en el IDE; sirve para enfocar su ventana. */
+  projectDir: string | null;
   transcriptPath: string | null;
   permissionMode: string | null;
   model: string | null;
@@ -84,6 +86,7 @@ export interface SanitizeContext {
   ts: number;
   pid: number | null;
   origin: HookOrigin;
+  projectDir: string | null;
 }
 
 /**
@@ -108,6 +111,7 @@ export function sanitizeHookPayload(raw: unknown, context: SanitizeContext): Hoo
     pid: context.pid,
     origin: context.origin,
     cwd: text(payload.cwd),
+    projectDir: context.projectDir === null ? null : text(context.projectDir),
     transcriptPath: text(payload.transcript_path),
     permissionMode: text(payload.permission_mode),
     model: text(payload.model),

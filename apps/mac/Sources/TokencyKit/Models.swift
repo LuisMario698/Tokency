@@ -43,6 +43,9 @@ public struct Session: Codable, Sendable, Equatable, Identifiable {
   public var origin: SessionOrigin
   public var cwd: String?
   public var projectName: String?
+  /// Carpeta abierta en el IDE y terminal del proceso: sirven para enfocar la sesión exacta.
+  public var projectDir: String?
+  public var tty: String?
   public var model: String?
   public var lastPrompt: String?
   /// Milisegundos desde epoch, como en el core.
@@ -52,7 +55,8 @@ public struct Session: Codable, Sendable, Equatable, Identifiable {
 
   public init(
     id: String, sessionId: String, pid: Int? = nil, state: SessionState, origin: SessionOrigin,
-    cwd: String? = nil, projectName: String? = nil, model: String? = nil, lastPrompt: String? = nil,
+    cwd: String? = nil, projectName: String? = nil, projectDir: String? = nil, tty: String? = nil,
+    model: String? = nil, lastPrompt: String? = nil,
     startedAt: Double, stateChangedAt: Double, lastActivityAt: Double
   ) {
     self.id = id
@@ -62,6 +66,8 @@ public struct Session: Codable, Sendable, Equatable, Identifiable {
     self.origin = origin
     self.cwd = cwd
     self.projectName = projectName
+    self.projectDir = projectDir
+    self.tty = tty
     self.model = model
     self.lastPrompt = lastPrompt
     self.startedAt = startedAt

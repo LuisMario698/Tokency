@@ -109,6 +109,8 @@ function session(id: string, state: Session["state"]): Session {
     origin: { kind: "cli", entrypoint: "cli", bundleId: null, termProgram: null },
     cwd: "/repo",
     projectName: "repo",
+    projectDir: null,
+    tty: null,
     transcriptPath: null,
     model: null,
     permissionMode: null,
@@ -141,6 +143,17 @@ describe("base local", () => {
     repo.save({ ...session("b:1", "ended") });
     repo.save(session("c:1", "done"));
     repo.remove("c:1");
+
+    expect(repo.loadActive()).toEqual([session("a:1", "working")]);
+  });
+
+  it("carga sesiones guardadas por una versión sin projectDir ni tty", () => {
+    const db = openDatabase(":memory:");
+    const repo = new SessionRepository(db, silentLogger);
+    const { projectDir: _p, tty: _t, ...legacy } = session("a:1", "working");
+    db.prepare(
+      "INSERT INTO sessions (id, session_id, state, started_at, last_activity_at, data) VALUES ('a:1', 'a', 'working', 1, 1, ?)",
+    ).run(JSON.stringify(legacy));
 
     expect(repo.loadActive()).toEqual([session("a:1", "working")]);
   });

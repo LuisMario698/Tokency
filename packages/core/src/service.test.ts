@@ -11,6 +11,7 @@ import { silentLogger } from "./logger.ts";
 import { tokencyPaths, type TokencyPaths } from "./paths.ts";
 import { startCore, type RunningCore } from "./service.ts";
 import { isProcessAlive } from "./watchers/processes.ts";
+import { ttyPath } from "./watchers/tty.ts";
 import { readTranscriptCwd, sessionIdFromPath, watchTranscripts } from "./watchers/transcripts.ts";
 
 const UUID = "4ad59146-8d64-4d16-917f-77093d0431a0";
@@ -57,6 +58,14 @@ describe("isProcessAlive", () => {
 
     expect(isProcessAlive(process.pid)).toBe(true);
     expect(isProcessAlive(child.pid ?? 0)).toBe(false);
+  });
+});
+
+describe("ttyPath", () => {
+  it("convierte la salida de ps en una ruta de dispositivo", () => {
+    expect(ttyPath("ttys003\n")).toBe("/dev/ttys003");
+    expect(ttyPath("??")).toBeNull();
+    expect(ttyPath("")).toBeNull();
   });
 });
 
@@ -121,6 +130,7 @@ describe("startCore", () => {
       port,
       logger: silentLogger,
       isAlive: (pid: number) => alive.has(pid),
+      resolveTty: (pid: number) => Promise.resolve(pid === 4242 ? "/dev/ttys009" : null),
     };
     core = await startCore(options);
     const headers = {
@@ -135,6 +145,7 @@ describe("startCore", () => {
       pid: 4242,
       origin: { entrypoint: "cli", bundleId: "com.apple.Terminal", termProgram: "Apple_Terminal" },
       cwd: "/Users/x/repo",
+      projectDir: null,
       transcriptPath: null,
       permissionMode: "default",
       model: null,
@@ -158,8 +169,8 @@ describe("startCore", () => {
     core = await startCore(options);
     const listed = await fetch(`http://127.0.0.1:${String(port)}/v1/sessions`, { headers });
     const { sessions } = (await listed.json()) as { sessions: Session[] };
-    expect(sessions.map((s) => [s.id, s.state, s.projectName])).toEqual([
-      [`${UUID}:4242`, "working", "repo"],
+    expect(sessions.map((s) => [s.id, s.state, s.projectName, s.tty])).toEqual([
+      [`${UUID}:4242`, "working", "repo", "/dev/ttys009"],
     ]);
   });
 

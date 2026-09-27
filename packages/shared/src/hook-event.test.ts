@@ -14,6 +14,7 @@ const context: SanitizeContext = {
   ts: 1_000,
   pid: 42,
   origin: { entrypoint: "cli", bundleId: "com.apple.Terminal", termProgram: "Apple_Terminal" },
+  projectDir: "/repo",
 };
 
 const common = {
@@ -43,6 +44,7 @@ describe("sanitizeHookPayload", () => {
       pid: 42,
       origin: context.origin,
       cwd: "/repo",
+      projectDir: "/repo",
       transcriptPath: "/Users/x/.claude/projects/-repo/s1.jsonl",
       permissionMode: "auto",
       model: null,
@@ -115,6 +117,15 @@ describe("sanitizeHookPayload", () => {
     const event = sanitizeHookPayload({ ...common, cwd: "x".repeat(10_000) }, context);
 
     expect(event?.cwd).toHaveLength(4096);
+  });
+});
+
+describe("compatibilidad", () => {
+  it("acepta eventos de hooks anteriores que no mandan projectDir", () => {
+    const event = sanitizeHookPayload({ ...common, hook_event_name: "Stop" }, context);
+    const { projectDir: _omitido, ...legacy } = event ?? {};
+
+    expect(hookEventSchema.parse(legacy).projectDir).toBeNull();
   });
 });
 

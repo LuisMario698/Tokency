@@ -19,6 +19,8 @@ export default defineConfig([
     },
     rules: {
       "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+      // Permite quitar campos con `const { campo: _, ...resto } = objeto`.
+      "@typescript-eslint/no-unused-vars": ["error", { ignoreRestSiblings: true }],
     },
   },
   {

@@ -12,6 +12,7 @@ import type { TokencyPaths } from "./paths.ts";
 import { SessionRegistry } from "./sessions/registry.ts";
 import { isProcessAlive } from "./watchers/processes.ts";
 import { watchTranscripts } from "./watchers/transcripts.ts";
+import { processTty } from "./watchers/tty.ts";
 
 const MAINTENANCE_INTERVAL_MS = 5_000;
 const HOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
@@ -24,6 +25,7 @@ export interface CoreOptions {
   port?: number;
   logger?: Logger;
   isAlive?: (pid: number) => boolean;
+  resolveTty?: (pid: number) => Promise<string | null>;
   /** Para pruebas: tiempos más cortos que los de producción. */
   timing?: { maintenanceMs?: number; transcriptGraceMs?: number; transcriptThrottleMs?: number };
 }
@@ -35,7 +37,7 @@ export interface RunningCore {
 }
 
 export async function startCore(options: CoreOptions): Promise<RunningCore> {
-  const { paths, version, isAlive = isProcessAlive } = options;
+  const { paths, version, isAlive = isProcessAlive, resolveTty = processTty } = options;
   const { config, warnings } = loadConfig(paths.configFile);
   const logger =
     options.logger ??
@@ -53,6 +55,23 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
   });
   registry.load();
   repository.pruneHookEvents(Date.now() - HOOK_EVENT_RETENTION_MS);
+
+  // La terminal de cada sesión de terminal se averigua una vez, fuera del hook para no frenarlo.
+  const ttyRequested = new Set<string>();
+  const unsubscribeTty = registry.subscribe((change) => {
+    if (change.type !== "updated") return;
+    const { id, pid, tty, origin, state } = change.session;
+    if (pid === null || tty !== null || origin.kind !== "cli" || state === "ended") return;
+    if (ttyRequested.has(id)) return;
+    ttyRequested.add(id);
+    resolveTty(pid)
+      .then((found) => {
+        if (found !== null) registry.setTty(id, found);
+      })
+      .catch((error: unknown) => {
+        logger.warn("No se pudo averiguar la terminal de la sesión", { id, error });
+      });
+  });
 
   const startedAt = Date.now();
   const app = createApi({
@@ -106,6 +125,7 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
     registry,
     async close() {
       clearInterval(maintenance);
+      unsubscribeTty();
       transcripts.close();
       await new Promise<void>((resolve) => {
         server.close(() => {

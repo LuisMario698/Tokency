@@ -29,6 +29,7 @@ function hook(event: HookEventName, extra: Partial<HookEvent> = {}): HookEvent {
     pid: 100,
     origin: { entrypoint: "cli", bundleId: "com.apple.Terminal", termProgram: null },
     cwd: "/repo",
+    projectDir: "/repo",
     transcriptPath: "/p/s1.jsonl",
     permissionMode: null,
     model: null,
@@ -176,6 +177,18 @@ describe("SessionRegistry", () => {
 
       expect(registry.get("s1:100")?.lastActivityAt).toBe(3_000);
     });
+  });
+
+  it("anota la terminal de la sesión y avisa el cambio", () => {
+    registry.applyHook(hook("UserPromptSubmit"));
+    changes = [];
+
+    registry.setTty("s1:100", "/dev/ttys003");
+    registry.setTty("s1:100", "/dev/ttys003");
+    registry.setTty("no-existe", "/dev/ttys004");
+
+    expect(registry.get("s1:100")).toMatchObject({ tty: "/dev/ttys003", projectDir: "/repo" });
+    expect(changes).toHaveLength(1);
   });
 
   it("olvida las sesiones terminadas después de un rato", () => {

@@ -51,6 +51,7 @@ export function buildHookEvent(
     fallbackEvent: eventName,
     ts,
     pid: claudePid(deps.env, deps.ppid),
+    projectDir: envText(deps.env.CLAUDE_PROJECT_DIR),
     origin: {
       entrypoint: envText(deps.env.CLAUDE_CODE_ENTRYPOINT),
       bundleId: envText(deps.env.__CFBundleIdentifier),

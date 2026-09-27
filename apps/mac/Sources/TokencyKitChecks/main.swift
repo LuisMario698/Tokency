@@ -144,6 +144,53 @@ do {
   check(elapsedLabel(since: start, now: Date(timeIntervalSince1970: 125 * 60)) == "2 h 5 min", "horas y minutos")
 }
 
+// MARK: - Foco de la sesión
+
+do {
+  func focusSession(kind: OriginKind, bundleId: String?, termProgram: String? = nil, dir: String? = "/Users/x/repo", tty: String? = nil)
+    -> Session
+  {
+    Session(
+      id: "s:1", sessionId: "7a437b7b-5e77-407c-a89e-fcd58109ccd8", pid: 1, state: .working,
+      origin: SessionOrigin(kind: kind, bundleId: bundleId, termProgram: termProgram), projectDir: dir, tty: tty,
+      startedAt: 0, stateChangedAt: 0, lastActivityAt: 0)
+  }
+  let schemes = { (id: String) -> String? in id == "com.google.antigravity-ide" ? "antigravity-ide" : nil }
+
+  let ide = SessionFocus.plan(for: focusSession(kind: .ide, bundleId: "com.google.antigravity-ide"), urlScheme: schemes)
+  check(
+    ide == .ideWindow(
+      bundleId: "com.google.antigravity-ide", folder: "/Users/x/repo",
+      sessionURL: URL(string: "antigravity-ide://anthropic.claude-code/open?session=7a437b7b-5e77-407c-a89e-fcd58109ccd8")),
+    "extensión: enfoca la ventana del proyecto y la pestaña de la sesión")
+
+  let integrated = SessionFocus.plan(
+    for: focusSession(kind: .cli, bundleId: "com.google.antigravity-ide", termProgram: "vscode"), urlScheme: schemes)
+  check(
+    integrated == .ideWindow(bundleId: "com.google.antigravity-ide", folder: "/Users/x/repo", sessionURL: nil),
+    "terminal integrada: solo la ventana del proyecto")
+
+  let terminal = SessionFocus.plan(
+    for: focusSession(kind: .cli, bundleId: "com.apple.Terminal", tty: "/dev/ttys003"), urlScheme: schemes)
+  if case .terminalTab(let bundleId, let script) = terminal {
+    check(bundleId == "com.apple.Terminal" && script.contains("\"/dev/ttys003\""), "Terminal.app: pestaña por tty")
+  } else {
+    check(false, "Terminal.app: pestaña por tty")
+  }
+
+  check(
+    SessionFocus.plan(for: focusSession(kind: .cli, bundleId: "com.apple.Terminal", tty: "/dev/ttys3\" & evil"), urlScheme: schemes)
+      == .activate(bundleId: "com.apple.Terminal"), "rechaza un tty que inyectaría AppleScript")
+  check(
+    SessionFocus.plan(for: focusSession(kind: .desktop, bundleId: "com.anthropic.claudefordesktop"), urlScheme: schemes)
+      == .activate(bundleId: "com.anthropic.claudefordesktop"), "Claude Desktop: solo activa la app")
+  check(SessionFocus.plan(for: focusSession(kind: .unknown, bundleId: nil), urlScheme: schemes) == .none, "sin app no hace nada")
+  check(
+    SessionFocus.primaryURLScheme(infoDictionary: [
+      "CFBundleURLTypes": [["CFBundleURLSchemes": ["msauth.x"]], ["CFBundleURLSchemes": ["claude"]]]
+    ]) == "claude", "elige el esquema propio y descarta msauth")
+}
+
 // MARK: - Resultado
 
 if failures.isEmpty {

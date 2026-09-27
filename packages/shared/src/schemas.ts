@@ -12,6 +12,8 @@ export const hookEventSchema = z.object({
   pid: z.number().int().positive().nullable(),
   origin: z.object({ entrypoint: shortText, bundleId: shortText, termProgram: shortText }),
   cwd: longText,
+  // Opcional para aceptar eventos de hooks instalados con una versión anterior.
+  projectDir: longText.default(null),
   transcriptPath: longText,
   permissionMode: shortText,
   model: shortText,
@@ -70,6 +72,10 @@ export const sessionSchema = z.object({
   }),
   cwd: longText,
   projectName: longText,
+  /** Carpeta abierta en el IDE, para enfocar su ventana al hacer clic. */
+  projectDir: longText.default(null),
+  /** Terminal del proceso `claude` (`/dev/ttys003`), para enfocar su pestaña. */
+  tty: shortText.default(null),
   transcriptPath: longText,
   model: shortText,
   permissionMode: shortText,
