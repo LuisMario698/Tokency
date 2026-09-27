@@ -1,7 +1,12 @@
 import type { HookEvent, LiveEvent, Session } from "@tokency/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { openDatabase } from "../db/database.ts";
 import { silentLogger } from "../logger.ts";
+import { UsageIngestor } from "../usage/ingest.ts";
+import { DEFAULT_PRICING } from "../usage/pricing.ts";
+import { UsageRepository } from "../usage/repository.ts";
+import { UsageService } from "../usage/service.ts";
 import { SessionRegistry, type SessionStore } from "../sessions/registry.ts";
 import { createApi, startApiServer, tokensMatch } from "./server.ts";
 
@@ -17,6 +22,7 @@ const store: SessionStore = {
 let registry: SessionRegistry;
 let recorded: string[];
 let app: ReturnType<typeof createApi>;
+let usage: UsageService;
 
 function headers(extra: Record<string, string> = {}): Record<string, string> {
   return { host: `127.0.0.1:${String(PORT)}`, authorization: `Bearer ${TOKEN}`, ...extra };
@@ -48,7 +54,21 @@ function event(extra: Partial<HookEvent> = {}): HookEvent {
 beforeEach(() => {
   registry = new SessionRegistry({ store, now: () => 1_000 });
   recorded = [];
+  const usageRepository = new UsageRepository(openDatabase(":memory:"));
+  usage = new UsageService({
+    repository: usageRepository,
+    ingestor: new UsageIngestor({
+      repository: usageRepository,
+      projectsDir: "/no-existe",
+      logger: silentLogger,
+    }),
+    pricing: DEFAULT_PRICING,
+    timeZone: "UTC",
+    now: () => 1_000,
+  });
   app = createApi({
+    usage,
+    usageThrottleMs: 0,
     token: TOKEN,
     port: PORT,
     registry,
@@ -152,6 +172,42 @@ describe("rutas", () => {
   });
 });
 
+describe("rutas de uso", () => {
+  it("GET /v1/usage/summary devuelve el resumen", async () => {
+    const response = await app.request("/v1/usage/summary", { headers: headers() });
+    const body = (await response.json()) as { window: unknown; timeZone: string };
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ window: null, timeZone: "UTC" });
+  });
+
+  it("GET /v1/usage/daily acota los días pedidos", async () => {
+    const response = await app.request("/v1/usage/daily?days=5000", { headers: headers() });
+    const body = (await response.json()) as { days: unknown[] };
+
+    expect(body.days).toHaveLength(365);
+  });
+
+  it("POST /v1/usage/limit-hit registra una muestra manual", async () => {
+    const response = await app.request("/v1/usage/limit-hit", {
+      method: "POST",
+      headers: headers(),
+    });
+    const body = (await response.json()) as { calibration: { lastLimit: { source: string } } };
+
+    expect(response.status).toBe(201);
+    expect(body.calibration.lastLimit.source).toBe("manual");
+  });
+
+  it("las rutas de uso también exigen el token", async () => {
+    const response = await app.request("/v1/usage/summary", {
+      headers: headers({ authorization: "" }),
+    });
+
+    expect(response.status).toBe(401);
+  });
+});
+
 describe("GET /v1/events", () => {
   async function readEvents(count: number, action: () => void): Promise<string[]> {
     const response = await app.request("/v1/events", { headers: headers() });
@@ -184,14 +240,18 @@ describe("GET /v1/events", () => {
   it("manda una foto inicial y después cada cambio", async () => {
     registry.applyHook(event({ sessionId: "s0" }));
 
-    const events = await readEvents(2, () => {
+    const events = await readEvents(4, () => {
       registry.applyHook(event());
+      usage.recordManualLimit();
     });
 
-    const [snapshot, update] = events.map(
-      (line) => JSON.parse(line.slice(line.indexOf(" ") + 1)) as LiveEvent,
-    );
-    expect(events[0]?.startsWith("snapshot ")).toBe(true);
+    // El snapshot va primero; después, el orden entre uso y sesiones depende de la carrera.
+    const names = events.map((line) => line.slice(0, line.indexOf(" ")));
+    expect(names[0]).toBe("snapshot");
+    expect(names.slice(1).sort()).toEqual(["session.updated", "usage.updated", "usage.updated"]);
+    const parsed = events.map((line) => JSON.parse(line.slice(line.indexOf(" ") + 1)) as LiveEvent);
+    const snapshot = parsed[0];
+    const update = parsed.find((e) => e.type === "session.updated");
     expect(snapshot?.type === "snapshot" && snapshot.sessions.map((s) => s.id)).toEqual(["s0:10"]);
     expect(update?.type === "session.updated" && update.session.id).toBe("s1:10");
   });

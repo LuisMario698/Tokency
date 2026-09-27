@@ -13,9 +13,15 @@ import { SessionRegistry } from "./sessions/registry.ts";
 import { isProcessAlive } from "./watchers/processes.ts";
 import { watchTranscripts } from "./watchers/transcripts.ts";
 import { processTty } from "./watchers/tty.ts";
+import { UsageIngestor } from "./usage/ingest.ts";
+import { mergePricing } from "./usage/pricing.ts";
+import { UsageRepository } from "./usage/repository.ts";
+import { UsageService } from "./usage/service.ts";
 
 const MAINTENANCE_INTERVAL_MS = 5_000;
 const HOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
+/** Recorrido completo de respaldo, por si el vigilante perdió algún cambio. */
+const USAGE_RESCAN_MS = 5 * 60_000;
 
 export interface CoreOptions {
   paths: TokencyPaths;
@@ -27,12 +33,21 @@ export interface CoreOptions {
   isAlive?: (pid: number) => boolean;
   resolveTty?: (pid: number) => Promise<string | null>;
   /** Para pruebas: tiempos más cortos que los de producción. */
-  timing?: { maintenanceMs?: number; transcriptGraceMs?: number; transcriptThrottleMs?: number };
+  timing?: {
+    maintenanceMs?: number;
+    transcriptGraceMs?: number;
+    transcriptThrottleMs?: number;
+    fileDebounceMs?: number;
+  };
+  timeZone?: string;
 }
 
 export interface RunningCore {
   port: number;
   registry: SessionRegistry;
+  usage: UsageService;
+  /** Termina cuando acaba la primera lectura del historial de uso. */
+  initialScan: Promise<void>;
   close(): Promise<void>;
 }
 
@@ -73,12 +88,25 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
       });
   });
 
+  const usageRepository = new UsageRepository(db);
+  const usage = new UsageService({
+    repository: usageRepository,
+    ingestor: new UsageIngestor({
+      repository: usageRepository,
+      projectsDir: paths.claudeProjectsDir,
+      logger,
+    }),
+    pricing: mergePricing(config.pricing),
+    timeZone: options.timeZone,
+  });
+
   const startedAt = Date.now();
   const app = createApi({
     token,
     port: options.port ?? config.port,
     registry,
     recorder: repository,
+    usage,
     logger,
     version,
     startedAt,
@@ -97,10 +125,32 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
     throttleMs: options.timing?.transcriptThrottleMs,
     projectsDir: paths.claudeProjectsDir,
     logger,
+    fileDebounceMs: options.timing?.fileDebounceMs,
     onActivity: ({ sessionId, transcriptPath, cwd }) => {
       registry.transcriptActivity(sessionId, { transcriptPath, cwd });
     },
+    onFile: (file) => {
+      usage.ingestFile(file).catch((error: unknown) => {
+        logger.warn("Falló la ingesta de uso", { file, error });
+      });
+    },
   });
+
+  // La primera lectura del historial va en segundo plano: la API ya responde mientras tanto.
+  const scanStarted = Date.now();
+  const initialScan = usage
+    .scanAll()
+    .then((result) => {
+      logger.info("Historial de uso leído", { ...result, ms: Date.now() - scanStarted });
+    })
+    .catch((error: unknown) => {
+      logger.error("Falló la lectura del historial de uso", { error });
+    });
+  const rescan = setInterval(() => {
+    usage.scanAll().catch((error: unknown) => {
+      logger.warn("Falló el recorrido de uso", { error });
+    });
+  }, USAGE_RESCAN_MS);
 
   let lastPrune = Date.now();
   const maintenance = setInterval(() => {
@@ -123,8 +173,12 @@ export async function startCore(options: CoreOptions): Promise<RunningCore> {
   return {
     port,
     registry,
+    usage,
+    initialScan,
     async close() {
       clearInterval(maintenance);
+      clearInterval(rescan);
+      await initialScan;
       unsubscribeTty();
       transcripts.close();
       await new Promise<void>((resolve) => {

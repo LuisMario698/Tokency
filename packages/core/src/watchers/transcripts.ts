@@ -54,6 +54,9 @@ export interface TranscriptActivity {
 export interface TranscriptWatcherOptions {
   projectsDir: string;
   onActivity: (activity: TranscriptActivity) => void;
+  /** Cualquier `.jsonl` que cambió (también de subagentes), un segundo después de su última escritura. */
+  onFile?: (file: string) => void;
+  fileDebounceMs?: number;
   logger: Logger;
   /** Como mucho un aviso por sesión en este intervalo. */
   throttleMs?: number;
@@ -63,7 +66,16 @@ export interface TranscriptWatcherOptions {
 }
 
 export function watchTranscripts(options: TranscriptWatcherOptions): { close(): void } {
-  const { projectsDir, onActivity, logger, throttleMs = 2_000, retryMs = 60_000 } = options;
+  const {
+    projectsDir,
+    onActivity,
+    onFile,
+    logger,
+    throttleMs = 2_000,
+    retryMs = 60_000,
+    fileDebounceMs = 1_000,
+  } = options;
+  const fileTimers = new Map<string, NodeJS.Timeout>();
   const now = options.now ?? Date.now;
   const lastEmit = new Map<string, number>();
   const cwdCache = new Map<string, string | null>();
@@ -71,7 +83,20 @@ export function watchTranscripts(options: TranscriptWatcherOptions): { close(): 
   let retry: NodeJS.Timeout | undefined;
   let closed = false;
 
+  function handleFile(filename: string): void {
+    if (onFile === undefined || !filename.endsWith(".jsonl")) return;
+    const file = path.join(projectsDir, filename);
+    clearTimeout(fileTimers.get(file));
+    const timer = setTimeout(() => {
+      fileTimers.delete(file);
+      if (!closed) onFile(file);
+    }, fileDebounceMs);
+    timer.unref();
+    fileTimers.set(file, timer);
+  }
+
   function handle(filename: string): void {
+    handleFile(filename);
     const sessionId = sessionIdFromPath(filename);
     if (sessionId === null) return;
     const at = now();
@@ -123,6 +148,7 @@ export function watchTranscripts(options: TranscriptWatcherOptions): { close(): 
     close() {
       closed = true;
       clearTimeout(retry);
+      for (const timer of fileTimers.values()) clearTimeout(timer);
       watcher?.close();
     },
   };

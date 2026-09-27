@@ -11,6 +11,8 @@ import { streamSSE } from "hono/streaming";
 
 import type { Logger } from "../logger.ts";
 import type { SessionChange, SessionRegistry } from "../sessions/registry.ts";
+import type { UsageService } from "../usage/service.ts";
+import { registerUsageRoutes } from "./usage-routes.ts";
 import { instanceId } from "../sessions/state-machine.ts";
 
 export interface HookEventRecorder {
@@ -22,6 +24,9 @@ export interface ApiOptions {
   port: number;
   registry: SessionRegistry;
   recorder?: HookEventRecorder;
+  usage?: UsageService;
+  /** Espera mínima entre dos `usage.updated` por la misma conexión. */
+  usageThrottleMs?: number;
   logger: Logger;
   version: string;
   startedAt: number;
@@ -70,7 +75,15 @@ function guard(options: ApiOptions): MiddlewareHandler {
 }
 
 export function createApi(options: ApiOptions): Hono {
-  const { registry, logger, recorder, now = Date.now, heartbeatMs = 15_000 } = options;
+  const {
+    registry,
+    logger,
+    recorder,
+    usage,
+    now = Date.now,
+    heartbeatMs = 15_000,
+    usageThrottleMs = 3_000,
+  } = options;
   const app = new Hono();
 
   app.use("*", guard(options));
@@ -115,6 +128,8 @@ export function createApi(options: ApiOptions): Hono {
 
   app.get("/v1/sessions", (c) => c.json({ sessions: registry.list() }));
 
+  if (usage !== undefined) registerUsageRoutes(app, usage);
+
   app.get("/v1/events", (c) =>
     streamSSE(c, async (stream) => {
       const send = (event: LiveEvent) =>
@@ -122,16 +137,35 @@ export function createApi(options: ApiOptions): Hono {
       const unsubscribe = registry.subscribe((change) => {
         send(toLiveEvent(change)).catch(() => undefined);
       });
-      stream.onAbort(unsubscribe);
+      // El resumen de uso se manda al conectar y después, como mucho, cada `usageThrottleMs`.
+      let usageTimer: NodeJS.Timeout | undefined;
+      let lastUsage = 0;
+      const sendUsage = () => {
+        if (usage === undefined) return;
+        usageTimer = undefined;
+        lastUsage = now();
+        send({ type: "usage.updated", summary: usage.summary() }).catch(() => undefined);
+      };
+      const unsubscribeUsage = usage?.subscribe(() => {
+        if (usageTimer !== undefined) return;
+        usageTimer = setTimeout(sendUsage, Math.max(0, lastUsage + usageThrottleMs - now()));
+      });
+      const stop = () => {
+        unsubscribe();
+        unsubscribeUsage?.();
+        clearTimeout(usageTimer);
+      };
+      stream.onAbort(stop);
       try {
         await send({ type: "snapshot", sessions: registry.list() });
+        sendUsage();
         for (;;) {
           await stream.sleep(heartbeatMs);
           if (stream.aborted) break;
           await stream.writeSSE({ event: "ping", data: "{}" });
         }
       } finally {
-        unsubscribe();
+        stop();
       }
     }),
   );

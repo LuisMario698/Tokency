@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { HOOK_EVENTS, PROMPT_PREVIEW_LENGTH, type HookEvent } from "./hook-event.ts";
+import type { UsageSummary } from "./usage.ts";
 
 const shortText = z.string().max(200).nullable();
 const longText = z.string().max(4096).nullable();
@@ -95,4 +96,6 @@ export const liveEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("session.updated"), session: sessionSchema }),
   z.object({ type: z.literal("session.removed"), id: z.string() }),
 ]);
-export type LiveEvent = z.infer<typeof liveEventSchema>;
+/** `usage.updated` se agrega aparte: su contenido lo define `UsageSummary` y no se valida con Zod. */
+export type LiveEvent =
+  z.infer<typeof liveEventSchema> | { type: "usage.updated"; summary: UsageSummary };

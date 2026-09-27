@@ -9,6 +9,25 @@ export const DEFAULT_PORT = 7777;
 export const configSchema = z.object({
   port: z.number().int().min(1024).max(65_535).default(DEFAULT_PORT),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
+  // Precios propios que se combinan con la tabla por defecto (D-016), en USD por millón de tokens.
+  pricing: z
+    .object({
+      models: z
+        .record(
+          z.string(),
+          z.object({
+            input: z.number().nonnegative().optional(),
+            output: z.number().nonnegative().optional(),
+            cacheWrite5m: z.number().nonnegative().optional(),
+            cacheWrite1h: z.number().nonnegative().optional(),
+            cacheRead: z.number().nonnegative().optional(),
+            fastMultiplier: z.number().positive().optional(),
+          }),
+        )
+        .optional(),
+      webSearchPer1k: z.number().nonnegative().optional(),
+    })
+    .optional(),
   sessions: z
     .object({
       doneToIdleMinutes: z.number().positive().default(15),
