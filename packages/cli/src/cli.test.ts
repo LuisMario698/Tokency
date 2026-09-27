@@ -191,6 +191,7 @@ describe("tokency status", () => {
     expect(elapsed(30_000)).toBe("<1 min");
     expect(elapsed(5 * 60_000)).toBe("5 min");
     expect(elapsed(125 * 60_000)).toBe("2 h 5 min");
+    expect(elapsed(95 * 60 * 60_000 + 59 * 60_000)).toBe("3 d 23 h");
   });
 
   it("resume una sesión en una línea", () => {

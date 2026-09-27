@@ -25,7 +25,9 @@ export function elapsed(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
   if (minutes < 1) return "<1 min";
   if (minutes < 60) return `${String(minutes)} min`;
-  return `${String(Math.floor(minutes / 60))} h ${String(minutes % 60)} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${String(hours)} h ${String(minutes % 60)} min`;
+  return `${String(Math.floor(hours / 24))} d ${String(hours % 24)} h`;
 }
 
 export function formatSession(session: Session, now: number): string {

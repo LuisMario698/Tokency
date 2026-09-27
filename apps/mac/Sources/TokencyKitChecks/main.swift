@@ -142,6 +142,7 @@ do {
   let start = Date(timeIntervalSince1970: 0)
   check(elapsedLabel(since: start, now: Date(timeIntervalSince1970: 30)) == "<1 min", "menos de un minuto")
   check(elapsedLabel(since: start, now: Date(timeIntervalSince1970: 125 * 60)) == "2 h 5 min", "horas y minutos")
+  check(elapsedLabel(since: start, now: Date(timeIntervalSince1970: (95 * 60 + 59) * 60)) == "3 d 23 h", "días y horas")
 }
 
 // MARK: - Foco de la sesión

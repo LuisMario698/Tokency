@@ -79,8 +79,10 @@ export function summaryLines(summary: UsageSummary): string[] {
     lines.push(
       `Ventana de 5 horas: ${clock(window.start, timeZone)} → ${clock(window.end, timeZone)} · se reinicia en ${elapsed(window.resetsInMs)}`,
     );
-    const cap =
-      window.fractionOfCap === null || calibration.estimatedCap === null
+    // Con el dato oficial, la cercanía al límite ya está arriba; sin él, se estima.
+    const cap = plan?.fiveHour
+      ? `${compactTokens(window.totals.totalTokens)} tokens`
+      : window.fractionOfCap === null || calibration.estimatedCap === null
         ? "sin calibrar: usa el botón «Llegué al límite» de la app cuando te pase"
         : `${bar(window.fractionOfCap)} ${String(Math.round(window.fractionOfCap * 100))} % del tope estimado (${money(calibration.estimatedCap)}, ${String(calibration.samples)} muestras)`;
     lines.push(`  ${money(window.totals.cost)} equivalentes · ${cap}`);
@@ -134,7 +136,9 @@ export async function usageCommand(args: readonly string[]): Promise<number> {
       client.get<{ projects: ProjectUsage[] }>(`/v1/usage/projects?days=${String(days)}`),
     ]);
     say.title(
-      "Uso de Claude Code (estimación: solo esta Mac; el chat de claude.ai comparte el límite pero no se ve aquí)",
+      summary.plan === null
+        ? "Uso de Claude Code (estimación: solo esta Mac; el chat de claude.ai comparte el límite pero no se ve aquí)"
+        : "Uso de Claude Code (porcentajes oficiales de Claude; montos equivalentes en la API)",
     );
     for (const line of summaryLines(summary)) say.info(line);
     say.title(`Por día (últimos ${String(days)}):`);

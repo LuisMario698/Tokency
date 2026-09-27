@@ -76,5 +76,7 @@ public func elapsedLabel(since start: Date, now: Date) -> String {
   let minutes = Int(now.timeIntervalSince(start) / 60)
   if minutes < 1 { return "<1 min" }
   if minutes < 60 { return "\(minutes) min" }
-  return "\(minutes / 60) h \(minutes % 60) min"
+  let hours = minutes / 60
+  if hours < 24 { return "\(hours) h \(minutes % 60) min" }
+  return "\(hours / 24) d \(hours % 24) h"
 }
