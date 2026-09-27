@@ -142,29 +142,29 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 
 ### Tareas
 
-1. **Parser de JSONL** (`packages/core/src/usage/parser.ts`):
+1. ✅ **Parser de JSONL** (`packages/core/src/usage/parser.ts`):
    - Extrae los tokens de entrada, salida, escritura de caché (5 min y 1 h) y lectura de caché, además del modelo, `speed`, búsquedas web, hora, sesión y `cwd`.
    - Deduplica por `message.id` + `requestId` (D-015) e ignora las entradas `<synthetic>`.
    - Reconoce los avisos de límite (`You've hit your … limit · resets …`) y calcula la hora de reinicio en la zona horaria que indican.
    - Pruebas con fixtures anonimizados, sin contenido real.
-2. **Ingesta incremental** (`usage/ingest.ts`):
+2. ✅ **Ingesta incremental** (`usage/ingest.ts`):
    - Recorre `~/.claude/projects/**/*.jsonl`, incluidos los subagentes.
    - Guarda por archivo el byte hasta donde leyó, para procesar solo lo nuevo.
    - Se dispara al arrancar, con cada escritura que detecta el vigilante y cada 5 min como respaldo.
-3. **Tabla de precios editable** (D-016): valores por defecto de la referencia oficial, que el usuario puede cambiar en `config.json` (`pricing`). Si un modelo no tiene precio, se avisa en lugar de inventar.
-4. **Agregados** (`usage/aggregate.ts`, funciones puras):
+3. ✅ **Tabla de precios editable** (D-016): valores por defecto de la referencia oficial, que el usuario puede cambiar en `config.json` (`pricing`). Si un modelo no tiene precio, se avisa en lugar de inventar.
+4. ✅ **Agregados** (`usage/aggregate.ts`, funciones puras):
    - Ventanas de 5 horas con la regla observada (D-015), ancladas por los avisos de límite.
    - Ventana vigente con tiempo para el reinicio, ritmo de consumo y proyección.
    - Hoy, últimos 7 días, días en la zona horaria local, y totales por modelo, por proyecto y por sesión.
-5. **Calibración:**
+5. ✅ **Calibración:**
    - Cada aviso de límite en los JSONL es una muestra automática; el botón "Llegué al límite" agrega muestras manuales.
    - El tope estimado se calcula a partir de esas muestras, con la barra de cercanía siempre marcada como estimación.
-6. **API y SSE:**
+6. ✅ **API y SSE:**
    - `GET /v1/usage/summary`, `/v1/usage/daily`, `/v1/usage/projects` y `/v1/usage/windows`.
    - `POST /v1/usage/limit-hit`, para el botón de calibración.
    - Evento `usage.updated` cuando entra consumo nuevo, con los tokens de cada sesión abierta.
-7. **CLI:** `tokency usage [--days N]`.
-8. **App de Mac:**
+7. ✅ **CLI:** `tokency usage [--days N]`.
+8. ✅ **App de Mac:**
    - Sección de uso en el menú: ventana vigente, barra estimada, botón de calibración y enlace a la página oficial de uso.
    - Ventana de historial con gráficas por día y modelo, tabla por proyecto y ventanas recientes.
    - Tokens de la sesión al pasar el mouse sobre su banda.
@@ -183,3 +183,9 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - Los totales coinciden con un conteo independiente hecho con `jq` sobre los mismos JSONL.
 - La ingesta inicial de todo el historial termina en segundos y no bloquea la API.
 - La app muestra la ventana vigente con su reinicio, la barra estimada y el historial, siempre indicando que es una estimación que solo cubre Claude Code.
+
+### Avance — 2026-09-26
+
+- Validado con los transcripts reales: 2022 mensajes y totales idénticos a un conteo independiente con `jq`. La primera ingesta de 114 MB tarda 1,9 s y las siguientes solo leen lo nuevo.
+- Se detectaron solos los dos límites alcanzados (26-ago y 25-sep), con sus ventanas ancladas a la hora de reinicio. El tope estimado de partida es de unos $30,61 equivalentes por ventana; con más límites (automáticos o marcados a mano) se afina.
+- Además se corrigió un defecto de la Fase 1: el clic en una banda ahora lleva a la sesión exacta (pestaña de Terminal/iTerm2, o ventana y pestaña del IDE).
