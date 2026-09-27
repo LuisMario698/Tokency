@@ -6,7 +6,7 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 | ---------------------------- | ------------ |
 | 0 — Preparación y validación | ✅ Terminada |
 | 1 — Sesiones en vivo         | ✅ Terminada |
-| 2 — Uso                      | 🟡 En curso  |
+| 2 — Uso                      | ✅ Terminada |
 | 3 — Proyectos y GitHub       | ⚪ Pendiente |
 | 4 — Contexto                 | ⚪ Pendiente |
 | 5 — Google Drive             | ⚪ Pendiente |
@@ -168,7 +168,7 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
    - Sección de uso en el menú: ventana vigente, barra estimada, botón de calibración y enlace a la página oficial de uso.
    - Ventana de historial con gráficas por día y modelo, tabla por proyecto y ventanas recientes.
    - Tokens de la sesión al pasar el mouse sobre su banda.
-9. Pruebas, documentación, push y cierre de la fase.
+9. ✅ Pruebas, documentación, push y cierre de la fase.
 
 ### Archivos principales
 
@@ -189,3 +189,15 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - Validado con los transcripts reales: 2022 mensajes y totales idénticos a un conteo independiente con `jq`. La primera ingesta de 114 MB tarda 1,9 s y las siguientes solo leen lo nuevo.
 - Se detectaron solos los dos límites alcanzados (26-ago y 25-sep), con sus ventanas ancladas a la hora de reinicio. El tope estimado de partida es de unos $30,61 equivalentes por ventana; con más límites (automáticos o marcados a mano) se afina.
 - Además se corrigió un defecto de la Fase 1: el clic en una banda ahora lleva a la sesión exacta (pestaña de Terminal/iTerm2, o ventana y pestaña del IDE).
+
+### Cierre — 2026-09-26
+
+- `pnpm check` pasa (194 pruebas) y `TokencyKitChecks` pasa (42 verificaciones). El core y la app instalados ya traen el uso: `tokency install` actualizó el core sin tocar `settings.json`, y la app quedó en `~/Applications`, registrada para abrir al iniciar sesión.
+- Se corrigió una carrera de `launchctl` que dejaba el core detenido al reinstalar.
+- Decisiones de la fase: D-015 y D-016.
+
+### Pendientes
+
+- Revisión visual del usuario: sección de uso del menú, ventana de historial y tokens en las bandas.
+- La estimación del tope parte de solo dos muestras; se afina con cada límite alcanzado.
+- Del cierre de la Fase 1 siguen pendientes la prueba de reinicio de la Mac y los eventos sin validar de D-010.
