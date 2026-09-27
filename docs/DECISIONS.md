@@ -151,3 +151,28 @@ Dos variables de entorno que el hook hereda bastan; no hace falta recorrer la ca
   - Una sesión terminada solo se reabre con `SessionStart` o `UserPromptSubmit`; los demás eventos rezagados se ignoran.
   - Un evento con `ts` menor al último aplicado solo completa datos (modelo, cwd), sin cambiar el estado.
   - Una sesión vista solo por su JSONL se crea tras 5 s de gracia, por si su primer hook viene en camino, y se reemplaza en cuanto llegan los hooks.
+
+## D-015 · Cómo se mide el uso — 2026-09-26
+
+- **Duplicados:** Claude Code escribe una línea por bloque de contenido y repite el mismo `usage` con el mismo `message.id` y `requestId`. Se cuenta una sola vez por ese par, como hace `ccusage`. Las entradas del modelo `<synthetic>` (errores y avisos locales) no consumen y se ignoran.
+- **Ventana de 5 horas:** `ccusage` redondea el inicio a la hora, pero los avisos de límite reales del usuario muestran otra cosa. El 26 de agosto el primer mensaje fue a las 14:11Z y el reinicio a las 19:10Z; el 25 de septiembre, a las 04:20Z y a las 09:20Z. **Decisión:** la ventana empieza con el primer mensaje posterior al fin de la anterior y dura 5 horas. Cuando hay un aviso de límite con hora de reinicio, esa hora fija el final de su ventana.
+- **Avisos de límite:** son líneas con `isApiErrorMessage: true` y el texto `You've hit your <tipo> limit · resets <hora> (<zona horaria>)`. Cada aviso de tipo `session` es una muestra de calibración automática.
+- **Calibración:** la métrica es el costo equivalente en API de la ventana hasta el aviso, porque pondera modelos y tipos de token mejor que sumar tokens. Si se cambia la tabla de precios, las muestras se recalculan.
+- **Limitaciones:** es una estimación. Solo cubre Claude Code en esta Mac; el chat de claude.ai y otros equipos comparten el límite pero no se ven aquí, así que una ventana puede haber empezado antes de lo que se ve localmente.
+
+## D-016 · Tabla de precios editable — 2026-09-26
+
+- **Contexto:** el spec pide el costo equivalente en API con una tabla editable, no fija. Los valores por defecto salen de la referencia oficial de la API (precios por millón de tokens, consultados el 2026-09-26).
+- **Tabla por defecto (USD por millón de tokens):**
+
+  | Modelo           | Entrada | Salida | Caché 5 min | Caché 1 h | Lectura de caché |
+  | ---------------- | ------: | -----: | ----------: | --------: | ---------------: |
+  | claude-fable-5-1 |      10 |     50 |       12,50 |        20 |             0,25 |
+  | claude-fable-5   |      10 |     50 |       12,50 |        20 |             1,00 |
+  | claude-opus-5-5  |       4 |     20 |           5 |         8 |             0,20 |
+  | claude-opus-5    |       5 |     25 |        6,25 |        10 |             0,50 |
+  | claude-sonnet-5  |       2 |     10 |        2,50 |         4 |             0,20 |
+  | claude-haiku-4-5 |       1 |      5 |        1,25 |         2 |             0,10 |
+
+- **Recargos:** el modo rápido (`speed: "fast"`) multiplica por 2 en Opus 5 y Opus 5.5; las búsquedas web cuestan $10 por cada 1000. Las escrituras en caché de Opus 5.5 son derivadas (1,25× y 2×) y la referencia pide confirmarlas tras su lanzamiento.
+- **Edición:** `config.json` acepta `pricing`, que se combina con la tabla por defecto modelo por modelo. Si un modelo no tiene precio, su costo queda sin calcular y la app lo avisa.

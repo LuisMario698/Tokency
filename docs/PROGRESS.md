@@ -133,3 +133,53 @@ Registro vivo del avance por fases. La especificación completa está en [SPEC.m
 - Instalar la app en `~/Applications` con `scripts/mac/build-app.sh --install`: la que corre es la copia de desarrollo, que no se registra como ítem de inicio.
 - Probar un reinicio de la Mac (criterio de aceptación de la fase).
 - Validar lo que quedó sin probar en D-010: cierre de Claude Desktop con ⌘Q, `permission_prompt`, `SubagentStart` y `PreCompact`.
+
+---
+
+## Fase 2 — Uso
+
+**Objetivo:** saber cuánto de Claude Code has consumido: la ventana de 5 horas vigente y cuándo se reinicia, qué tan cerca estás del límite de tu plan Pro (estimado), el costo equivalente en API y el historial por día, modelo, proyecto y sesión.
+
+### Tareas
+
+1. **Parser de JSONL** (`packages/core/src/usage/parser.ts`):
+   - Extrae los tokens de entrada, salida, escritura de caché (5 min y 1 h) y lectura de caché, además del modelo, `speed`, búsquedas web, hora, sesión y `cwd`.
+   - Deduplica por `message.id` + `requestId` (D-015) e ignora las entradas `<synthetic>`.
+   - Reconoce los avisos de límite (`You've hit your … limit · resets …`) y calcula la hora de reinicio en la zona horaria que indican.
+   - Pruebas con fixtures anonimizados, sin contenido real.
+2. **Ingesta incremental** (`usage/ingest.ts`):
+   - Recorre `~/.claude/projects/**/*.jsonl`, incluidos los subagentes.
+   - Guarda por archivo el byte hasta donde leyó, para procesar solo lo nuevo.
+   - Se dispara al arrancar, con cada escritura que detecta el vigilante y cada 5 min como respaldo.
+3. **Tabla de precios editable** (D-016): valores por defecto de la referencia oficial, que el usuario puede cambiar en `config.json` (`pricing`). Si un modelo no tiene precio, se avisa en lugar de inventar.
+4. **Agregados** (`usage/aggregate.ts`, funciones puras):
+   - Ventanas de 5 horas con la regla observada (D-015), ancladas por los avisos de límite.
+   - Ventana vigente con tiempo para el reinicio, ritmo de consumo y proyección.
+   - Hoy, últimos 7 días, días en la zona horaria local, y totales por modelo, por proyecto y por sesión.
+5. **Calibración:**
+   - Cada aviso de límite en los JSONL es una muestra automática; el botón "Llegué al límite" agrega muestras manuales.
+   - El tope estimado se calcula a partir de esas muestras, con la barra de cercanía siempre marcada como estimación.
+6. **API y SSE:**
+   - `GET /v1/usage/summary`, `/v1/usage/daily`, `/v1/usage/projects` y `/v1/usage/windows`.
+   - `POST /v1/usage/limit-hit`, para el botón de calibración.
+   - Evento `usage.updated` cuando entra consumo nuevo, con los tokens de cada sesión abierta.
+7. **CLI:** `tokency usage [--days N]`.
+8. **App de Mac:**
+   - Sección de uso en el menú: ventana vigente, barra estimada, botón de calibración y enlace a la página oficial de uso.
+   - Ventana de historial con gráficas por día y modelo, tabla por proyecto y ventanas recientes.
+   - Tokens de la sesión al pasar el mouse sobre su banda.
+9. Pruebas, documentación, push y cierre de la fase.
+
+### Archivos principales
+
+- `packages/core/src/usage/`: `parser.ts`, `reset-time.ts`, `pricing.ts`, `ingest.ts`, `aggregate.ts`, `repository.ts`.
+- `packages/core/src/db/migrations.ts`: migración 2 con `usage_entries`, `usage_files` y `limit_events`.
+- `packages/core/src/api/usage-routes.ts`, `packages/cli/src/commands/usage.ts`.
+- `apps/mac/Sources/TokencyKit/Usage.swift`, `apps/mac/Sources/TokencyMac/UsageViews.swift`.
+
+### Criterios de aceptación
+
+- El parser deduplica y reconoce los avisos de límite con fixtures anonimizados; todo lo de parseo y cálculo tiene pruebas.
+- Los totales coinciden con un conteo independiente hecho con `jq` sobre los mismos JSONL.
+- La ingesta inicial de todo el historial termina en segundos y no bloquea la API.
+- La app muestra la ventana vigente con su reinicio, la barra estimada y el historial, siempre indicando que es una estimación que solo cubre Claude Code.
